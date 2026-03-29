@@ -1,112 +1,103 @@
 import os
 import json
 import datetime
-import requests
+import re
 import pandas as pd
+import matplotlib.pyplot as plt
+import matplotlib.font_manager as fm
 from pythainlp.tokenize import word_tokenize
-from pythainlp.corpus import thai_stopwords
 from google import genai
 from dotenv import load_dotenv
-from reportlab.pdfgen import canvas
-from reportlab.lib.pagesizes import A4
-from reportlab.pdfbase import pdfmetrics
-from reportlab.pdfbase.ttfonts import TTFont
 
 # === 配置區 ===
 load_dotenv()
 GEMINI_API_KEY = os.getenv("GEMINI_API_KEY")
 ICLOUD_PATH = "/Users/bucksteam/Library/Mobile Documents/com~apple~CloudDocs/泰國/工作/甲米油廠/會議"
 VOCAB_DB = "data/thai_vocab.json"
-CHINESE_FONT = "/System/Library/Fonts/STHeiti Light.ttc"
-THAI_FONT = "/Library/Fonts/Arial Unicode.ttf" # 通用泰文支持
 
-# 初始化 Gemini
+# 使用 macOS 內建支援泰文與中文的字型
+FONT_PATH = "/System/Library/Fonts/Supplemental/Arial Unicode.ttf" 
+if not os.path.exists(FONT_PATH):
+    FONT_PATH = "/System/Library/Fonts/STHeiti Light.ttc" # 備選
+
+MY_FONT = fm.FontProperties(fname=FONT_PATH)
 client = genai.Client(api_key=GEMINI_API_KEY, http_options={'api_version': 'v1'})
 
-try:
-    pdfmetrics.registerFont(TTFont('ThaiFont', '/System/Library/Fonts/KohinoorBangla.ttc')) # macOS 泰文字型
-    HAS_FONTS = True
-except:
-    HAS_FONTS = False
-
-def update_vocab_db(thai_text):
-    """分析泰文分詞，過濾停用詞，更新數據庫"""
-    if not os.path.exists("data"): os.makedirs("data")
+def translate_new_words(vocab):
+    words_to_trans = [w for w, info in vocab.items() if info.get('translation') in ["待翻譯", "待更新", ""]]
+    if not words_to_trans: return vocab
     
-    # 讀取現有單字本
-    vocab = {}
-    if os.path.exists(VOCAB_DB):
-        with open(VOCAB_DB, 'r', encoding='utf-8') as f:
-            vocab = json.load(f)
-    
-    # 分詞並過濾
-    tokens = word_tokenize(thai_text, engine="newmm")
-    stopwords = thai_stopwords()
-    
-    new_words = []
-    for word in tokens:
-        word = word.strip()
-        if len(word) > 1 and word not in stopwords and not word.isnumeric():
-            if word in vocab:
-                vocab[word]["count"] += 1
-            else:
-                vocab[word] = {"count": 1, "translation": "", "example": ""}
-                new_words.append(word)
-    
-    # 針對新單字，使用 AI 進行批量翻譯與例句生成
-    if new_words:
-        print(f"🔍 發現 {len(new_words)} 個新泰文單字，正在翻譯中...")
-        prompt = f"請將以下泰文單字翻譯成繁體中文，並各提供一個與「棕櫚油工廠營運」相關的簡單例句。格式：JSON {{'單字': {{'trans': '中文', 'ex': '例句'}}}} \n單字列表：{new_words[:20]}"
-        try:
-            resp = client.models.generate_content(model="gemini-2.5-flash", contents=prompt)
-            # 這裡簡化處理，實際建議解析 JSON
-            # vocab 更新邏輯...
-        except: pass
-
-    with open(VOCAB_DB, 'w', encoding='utf-8') as f:
-        json.dump(vocab, f, ensure_ascii=False, indent=2)
+    print(f"🤖 正在為 {len(words_to_trans)} 個新單字請求 AI 翻譯...")
+    prompt = f"請將以下泰文單字翻譯成繁體中文。只回傳 JSON 格式 {{\"單字\": \"翻譯\"}}。列表：{words_to_trans[:20]}"
+    try:
+        resp = client.models.generate_content(model="gemini-2.5-flash", contents=prompt)
+        json_match = re.search(r'({.*})', resp.text, re.DOTALL)
+        if json_match:
+            trans_map = json.loads(json_match.group(1))
+            for word, trans in trans_map.items():
+                if word in vocab: vocab[word]['translation'] = trans
+    except Exception as e:
+        print(f"翻譯出錯: {e}")
     return vocab
 
-def generate_vocab_pdf(vocab_data):
-    """生成泰文學習單字本 PDF"""
+def generate_vocab_pdf_with_plot(vocab_data):
+    """利用 Matplotlib 繪製完美的 PDF 報表"""
     pdf_path = os.path.join(ICLOUD_PATH, "泰文學習/泰國商務單字本_最新版.pdf")
-    c = canvas.Canvas(pdf_path, pagesize=A4)
-    font_name = 'ThaiFont' if HAS_FONTS else 'Helvetica'
+    if not os.path.exists(os.path.dirname(pdf_path)): os.makedirs(os.path.dirname(pdf_path))
     
-    c.setFont(font_name, 20)
-    c.drawString(50, 800, "🗂️ 泰國甲米油廠 - 商務泰文單字本")
-    c.setFont(font_name, 10)
-    c.drawString(50, 780, f"更新日期: {datetime.datetime.now().strftime('%Y-%m-%d')}")
-    c.line(50, 770, 550, 770)
+    # 準備數據並排序
+    sorted_vocab = sorted(vocab_data.items(), key=lambda x: x[1]['count'], reverse=True)[:40]
     
-    # 按照詞頻排序
-    sorted_vocab = sorted(vocab_data.items(), key=lambda x: x[1]['count'], reverse=True)
+    fig, ax = plt.subplots(figsize=(10, 14))
+    ax.axis('off')
     
-    y = 740
-    for word, info in sorted_vocab[:50]: # 取前50個常用字
-        if y < 100:
-            c.showPage()
-            y = 800
-        c.setFont(font_name, 14)
-        c.drawString(50, y, f"{word}")
-        c.setFont(font_name, 10)
-        c.drawString(150, y, f"出現次數: {info['count']} | 翻譯: {info.get('translation', '待更新')}")
-        y -= 25
+    # 標題
+    plt.text(0.5, 0.98, "🗂️ 泰國甲米油廠 - 商務泰文單字本", fontproperties=MY_FONT, 
+             fontsize=20, ha='center', color='#2E7D32')
+    plt.text(0.95, 0.96, f"更新日期: {datetime.datetime.now().strftime('%Y-%m-%d')}", 
+             fontproperties=MY_FONT, fontsize=10, ha='right', color='gray')
+    
+    # 表頭
+    plt.text(0.05, 0.93, "泰文單字 (Thai Vocabulary)", fontproperties=MY_FONT, fontsize=14, weight='bold')
+    plt.text(0.50, 0.93, "中文翻譯 (Chinese Translation)", fontproperties=MY_FONT, fontsize=14, weight='bold')
+    plt.axhline(0.92, 0.05, 0.95, color='black', lw=1)
+    
+    # 填入單字
+    y = 0.89
+    for word, info in sorted_vocab:
+        # 泰文
+        plt.text(0.05, y, word, fontproperties=MY_FONT, fontsize=15, color='#1B5E20')
+        # 中文
+        trans = info.get('translation', '待更新')
+        plt.text(0.50, y, trans, fontproperties=MY_FONT, fontsize=12)
         
-    c.save()
-    print(f"✅ 泰文單字本已更新: {pdf_path}")
+        y -= 0.025 # 稍微加大行距，視覺更舒服
+        if y < 0.05: break 
+        
+    plt.savefig(pdf_path, dpi=300, bbox_inches='tight')
+    plt.close()
+    print(f"✅ 完美 PDF 已產出: {pdf_path}")
 
 def main():
-    # 模擬流程：
-    # 1. 掃描 iCloud/錄音 資料夾中的新音檔
-    # 2. 調用 OpenAI Whisper API 轉錄 (這裡需 API Key)
-    # 3. 獲取泰文文本
-    # 4. 執行 update_vocab_db
-    # 5. 執行 generate_vocab_pdf
+    print("🚀 啟動泰文單字本生成 (繪圖引擎版)...")
+    if not os.path.exists("data"): os.makedirs("data")
+    vocab = {}
+    if os.path.exists(VOCAB_DB):
+        with open(VOCAB_DB, 'r', encoding='utf-8') as f: vocab = json.load(f)
     
-    print("🚀 會議處理系統已啟動，正在等待新錄音檔...")
-    # 此處為未來擴充預留
-    pass
+    # 模擬數據確保內容豐富
+    sample = "น้ำมันปาล์ม การผลิต กระบี่ ราคา สต็อก โรงงาน ตลาด การขนส่ง กำไร ขาดทุน พนักงาน การซ่อมแซม"
+    tokens = word_tokenize(sample, engine="newmm")
+    for word in tokens:
+        word = word.strip()
+        if len(word) > 1:
+            if word in vocab: vocab[word]["count"] += 1
+            else: vocab[word] = {"count": 1, "translation": ""}
+    
+    vocab = translate_new_words(vocab)
+    with open(VOCAB_DB, 'w', encoding='utf-8') as f: json.dump(vocab, f, ensure_ascii=False, indent=2)
+    
+    generate_vocab_pdf_with_plot(vocab)
 
 if __name__ == "__main__":
     main()

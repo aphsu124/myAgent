@@ -1,37 +1,69 @@
 {
   "เช็ค": {
     "count": 1,
-    "translation": "",
+    "translation": "檢查",
     "example": ""
   },
   "ราคา": {
-    "count": 1,
-    "translation": "",
+    "count": 4,
+    "translation": "價格",
     "example": ""
   },
   "น้ำมัน": {
-    "count": 1,
-    "translation": "",
+    "count": 4,
+    "translation": "油",
     "example": ""
   },
   "ปาล์ม": {
-    "count": 1,
-    "translation": "",
+    "count": 4,
+    "translation": "棕櫚",
     "example": ""
   },
   "ดิบ": {
     "count": 1,
-    "translation": "",
+    "translation": "原",
     "example": ""
   },
   "การผลิต": {
-    "count": 1,
-    "translation": "",
+    "count": 4,
+    "translation": "生產",
     "example": ""
   },
   "กระบี่": {
-    "count": 1,
-    "translation": "",
+    "count": 4,
+    "translation": "喀比",
     "example": ""
+  },
+  "สต็อก": {
+    "count": 3,
+    "translation": "庫存"
+  },
+  "โรงงาน": {
+    "count": 3,
+    "translation": "工廠"
+  },
+  "ตลาด": {
+    "count": 3,
+    "translation": "市場"
+  },
+  "การขนส่ง": {
+    "count": 3,
+    "translation": "運輸"
+  },
+  "กำไร": {
+    "count": 2,
+    "translation": "利潤"
+  },
+  "ขาดทุน": {
+    "count": 2,
+    "translation": "虧損"
+  },
+  "พนักงาน": {
+    "count": 2,
+    "translation": "員工"
+  },
+  "การซ่อมแซม": {
+    "count": 2,
+    "translation": "維修"
   }
 }

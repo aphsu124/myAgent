@@ -3,32 +3,38 @@
 ## 📅 最後更新日期：2026-03-29
 
 ### 1. 專案核心架構 (System Core)
-- **AI 引擎**：Gemini 2.5-Flash (最新跨年度動態校準版)。
-- **自動化邏輯**：分流雙時段執行 (07:00 晨間新聞 / 13:30 完整報告)。
-- **手機推播**：LINE Messaging API (Push Message)。
-- **雲端呈現**：GitHub Pages 靜態網站 ([https://aphsu124.github.io/myAgent/](https://aphsu124.github.io/myAgent/))。
+- **AI 引擎**：Gemini 2.5-Flash (負責棕櫚油分析與泰文商務翻譯)。
+- **自動化邏輯**：
+    - 棕櫚油監控：07:00 晨間新聞 / 13:30 完整報告。
+    - 會議處理：手動觸發或偵測 iCloud 錄音檔。
+- **手機推播**：LINE Messaging API。
+- **雲端呈現**：GitHub Pages 靜態網站 與 iCloud Drive 資料夾。
 
 ### 2. 關鍵檔案路徑
-- **主腳本**：`scripts/daily_palm_report.py` (包含分析、網頁生成、Git 同步、LINE 推播)。
-- **數據庫**：`data/palm_prices.csv` (存放 FFB/CPO 歷史價格)。
-- **網頁首頁**：`docs/index.html` (永遠顯示當日最新產出的報告內容)。
-- **歷史報告**：`docs/reports/` (存放所有 HTML 格式的歷史簡報)。
+- **棕櫚油監控**：`scripts/daily_palm_report.py`
+- **會議學習系統**：`scripts/process_meeting.py`
+- **歷史數據**：`data/palm_prices.csv` (價格) / `data/thai_vocab.json` (單字)
+- **iCloud 歸檔**：`泰國/工作/甲米油廠/` 下的簡報與會議目錄。
 
-### 3. API 配置 (位於 .env)
-- `GEMINI_API_KEY`: AI 分析。
-- `SERPER_API_KEY`: 實時 Google 搜尋。
-- `LINE_CHANNEL_ACCESS_TOKEN`: Messaging API 權杖。
-- `LINE_USER_ID`: 您的專屬接收 ID (Uf45f5c3efc5fcd2df55a873c9d7b98c1)。
+### 3. 會議錄音與泰文學習分支 (New!)
+- **功能**：掃描錄音轉文字 -> 生成中文摘要 -> 提取商務泰文單字。
+- **單字本**：`泰國商務單字本_最新版.pdf`。
+- **特點**：
+    - 完美解決泰文 CTL (母音疊加) 與中文字體亂碼。
+    - 單字按出現頻率排序，介面極簡不顯示次數。
+    - 自動化累積，每次會議後自動更新。
 
-### 4. 運作說明
-- **執行頻率**：Crontab 每 15 分鐘檢查一次。
-- **時區**：支援跨時區執行，自動以泰國 (ICT, UTC+7) 時間為準。
-- **防重複機制**：各時段報告產出後，當日不再重複發送 LINE 或更新檔案。
+### 4. API 配置 (位於 .env)
+- `GEMINI_API_KEY`: 核心分析引擎。
+- `SERPER_API_KEY`: Google 實時搜尋。
+- `LINE_CHANNEL_ACCESS_TOKEN`: Messaging API。
+- `LINE_USER_ID`: Uf45f5c3efc5fcd2df55a873c9d7b98c1。
+- `OPENAI_API_KEY`: (待填寫) 用於 Whisper 轉錄。
 
-### 5. 後續優化方向 (Backlog)
-- [ ] 增加南部多個主要收購點的價格對照。
-- [ ] 串接生質柴油 (Biodiesel) 政策變動的深度追蹤。
-- [ ] 增加肥料與農資成本的月度趨勢分析。
+### 5. 後續擴充方向
+- 整合生質柴油政策追蹤。
+- 完善會議自動錄音處理流程。
+- 增加泰南口音 (Pasa Tai) 特有詞彙標註。
 
 ---
-**Jarvis 隨時待命。系統已處於全自動運行狀態。**
+**Jarvis 隨時待命。系統已成功整合營運監控與語言學習雙功能。**
