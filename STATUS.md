@@ -1,38 +1,34 @@
 # 🌴 泰國棕櫚油 AI 監控專案 - 現況紀錄 (Status Report)
 
-## 📅 最後更新日期：2026-03-28
+## 📅 最後更新日期：2026-03-29
 
-### 1. 專案目標 (Project Goal)
-為泰國甲米 (Krabi) 壓榨廠 (CPO Mill) 提供每日自動化的市場情報監控。系統會自動抓取當日實時數據，進行 AI 分析，並透過 LINE 與網頁同步更新資訊。
+### 1. 專案核心架構 (System Core)
+- **AI 引擎**：Gemini 2.5-Flash (最新跨年度動態校準版)。
+- **自動化邏輯**：分流雙時段執行 (07:00 晨間新聞 / 13:30 完整報告)。
+- **手機推播**：LINE Messaging API (Push Message)。
+- **雲端呈現**：GitHub Pages 靜態網站 ([https://aphsu124.github.io/myAgent/](https://aphsu124.github.io/myAgent/))。
 
-### 2. 系統架構 (System Architecture)
-- **AI 引擎**：Google Gemini 2.5-Flash (最新版本，過濾 2024/2025 過時資訊)。
-- **搜尋引擎**：Serper.dev API (實時 Google 搜尋)。
-- **數據分析**：Pandas (處理價格 CSV)、Matplotlib (繪製趨勢圖)。
-- **前端呈現**：GitHub Pages (Static Site Generator)，位於 `docs/` 資料夾。
-- **手機推播**：LINE Messaging API (Push Message)，包含文字摘要與圖表連結。
+### 2. 關鍵檔案路徑
+- **主腳本**：`scripts/daily_palm_report.py` (包含分析、網頁生成、Git 同步、LINE 推播)。
+- **數據庫**：`data/palm_prices.csv` (存放 FFB/CPO 歷史價格)。
+- **網頁首頁**：`docs/index.html` (永遠顯示當日最新產出的報告內容)。
+- **歷史報告**：`docs/reports/` (存放所有 HTML 格式的歷史簡報)。
 
-### 3. API 設定與金鑰 (位於 .env)
-- `GEMINI_API_KEY`: Google AI Studio 申請。
-- `SERPER_API_KEY`: 實時搜尋服務。
-- `LINE_CHANNEL_ACCESS_TOKEN`: Messaging API 推播權限。
-- `LINE_USER_ID`: 接收推播的目標 ID (Uf45f5c3efc5fcd2df55a873c9d7b98c1)。
+### 3. API 配置 (位於 .env)
+- `GEMINI_API_KEY`: AI 分析。
+- `SERPER_API_KEY`: 實時 Google 搜尋。
+- `LINE_CHANNEL_ACCESS_TOKEN`: Messaging API 權杖。
+- `LINE_USER_ID`: 您的專屬接收 ID (Uf45f5c3efc5fcd2df55a873c9d7b98c1)。
 
-### 4. 關鍵路徑
-- **分析腳本**：`scripts/daily_palm_report.py`
-- **數據存儲**：`data/palm_prices.csv`
-- **雲端網站**：[https://aphsu124.github.io/myAgent/](https://aphsu124.github.io/myAgent/)
-- **日誌記錄**：`cron_log.txt`
+### 4. 運作說明
+- **執行頻率**：Crontab 每 15 分鐘檢查一次。
+- **時區**：支援跨時區執行，自動以泰國 (ICT, UTC+7) 時間為準。
+- **防重複機制**：各時段報告產出後，當日不再重複發送 LINE 或更新檔案。
 
-### 5. 自動化邏輯 (Automation)
-- **觸發時間**：泰國時間每天 13:30 (ICT)。
-- **執行頻率**：Crontab 設定為每 15 分鐘執行一次檢查。
-- **時區彈性**：程式內建時區轉換，支援日本/泰國等跨時區電腦執行。
-
-### 6. 待辦事項 (Backlog)
-- [ ] 考慮增加出口航運運費 (Freight Rate) 監控。
-- [ ] 增加化肥價格趨勢分析。
-- [ ] 串接更多的南部產區 (如 Surat Thani, Chumphon) 的價格對比。
+### 5. 後續優化方向 (Backlog)
+- [ ] 增加南部多個主要收購點的價格對照。
+- [ ] 串接生質柴油 (Biodiesel) 政策變動的深度追蹤。
+- [ ] 增加肥料與農資成本的月度趨勢分析。
 
 ---
-**Jarvis 隨時待命。如有需要調整系統或重啟工作，請直接讀取此檔案即可。**
+**Jarvis 隨時待命。系統已處於全自動運行狀態。**

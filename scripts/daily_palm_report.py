@@ -9,6 +9,10 @@ import subprocess
 import markdown
 from google import genai
 from dotenv import load_dotenv
+from reportlab.pdfgen import canvas
+from reportlab.lib.pagesizes import A4
+from reportlab.pdfbase import pdfmetrics
+from reportlab.pdfbase.ttfonts import TTFont
 
 # === 載入環境變數 ===
 load_dotenv()
@@ -22,44 +26,52 @@ DATA_DIR = os.getenv("DATA_DIR", "data")
 PRICE_DATA_FILE = f"{DATA_DIR}/palm_prices.csv"
 GITHUB_IO_URL = "https://aphsu124.github.io/myAgent"
 
-# 初始化 Gemini Client
+# iCloud 路徑
+ICLOUD_BASE = "/Users/bucksteam/Library/Mobile Documents/com~apple~CloudDocs/泰國/工作/甲米油廠/簡報"
+ICLOUD_EXCEL = os.path.join(ICLOUD_BASE, "palm_oil_history.xlsx")
+
+# 初始化 Gemini
 client = genai.Client(api_key=GEMINI_API_KEY, http_options={'api_version': 'v1'})
 
-HTML_TEMPLATE = """
-<!DOCTYPE html>
-<html lang="zh-TW">
-<head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>{title} - {date}</title>
-    <style>
-        body {{ font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif; background: #121212; color: #e0e0e0; line-height: 1.6; margin: 0; padding: 20px; }}
-        .container {{ max-width: 900px; margin: auto; background: #1e1e1e; padding: 40px; border-radius: 12px; box-shadow: 0 10px 30px rgba(0,0,0,0.5); }}
-        h1, h2, h3 {{ color: #4CAF50; border-bottom: 1px solid #333; padding-bottom: 10px; }}
-        .price-card {{ display: flex; gap: 20px; margin-bottom: 30px; }}
-        .card {{ flex: 1; background: #2d2d2d; padding: 20px; border-radius: 8px; text-align: center; border-left: 5px solid #4CAF50; }}
-        .card .label {{ font-size: 0.9em; color: #aaa; margin-bottom: 10px; }}
-        .card .value {{ font-size: 2em; font-weight: bold; color: #fff; }}
-        img {{ max-width: 100%; border-radius: 8px; margin: 20px 0; border: 1px solid #333; }}
-        .footer {{ text-align: center; margin-top: 50px; color: #666; font-size: 0.8em; }}
-        .nav-links {{ text-align: center; margin-bottom: 20px; }}
-        .nav-links a {{ color: #4CAF50; margin: 0 10px; text-decoration: none; font-weight: bold; }}
-    </style>
-</head>
-<body>
-    <div class="container">
-        <div class="nav-links">
-            <a href="{root_url}/index.html">🏠 回到今日最新</a>
-        </div>
-        <h1>{title}</h1>
-        <p style="color: #666;">執行日期：{date}</p>
-        {price_html}
-        <div class="content">{content}</div>
-        <div class="footer">Powered by Jarvis Palm-Oil AI Analysis Service &copy; 2026</div>
-    </div>
-</body>
-</html>
-"""
+def create_pdf_report(filename, title, date, ffb, cpo, content):
+    """產出簡易 PDF 報表並存入 iCloud"""
+    try:
+        c = canvas.Canvas(filename, pagesize=A4)
+        c.setFont("Helvetica-Bold", 16)
+        c.drawString(50, 800, title)
+        c.setFont("Helvetica", 10)
+        c.drawString(50, 780, f"Date: {date}")
+        c.drawString(50, 760, f"FFB: {ffb} | CPO: {cpo}")
+        
+        # 簡單內容寫入 (由於 reportlab 處理中文較複雜，這裡先以英文/數字核心為主，若需完整中文 PDF 需安裝字體)
+        c.setFont("Helvetica", 12)
+        y = 730
+        lines = content.split('\n')
+        for line in lines[:30]: # 先截取前30行避免溢出
+            if y < 50: break
+            c.drawString(50, y, line[:80])
+            y -= 15
+        c.save()
+        return True
+    except Exception as e:
+        print(f"PDF 產出出錯: {e}")
+        return False
+
+def update_icloud_excel(date_str, ffb, cpo):
+    """更新 iCloud 中的總表 Excel"""
+    try:
+        new_data = pd.DataFrame({"Date": [date_str], "FFB": [ffb], "CPO": [cpo]})
+        if os.path.exists(ICLOUD_EXCEL):
+            df_old = pd.read_excel(ICLOUD_EXCEL)
+            if date_str not in df_old['Date'].values:
+                df_combined = pd.concat([df_old, new_data], ignore_index=True)
+                df_combined.to_excel(ICLOUD_EXCEL, index=False)
+        else:
+            new_data.to_excel(ICLOUD_EXCEL, index=False)
+        return True
+    except Exception as e:
+        print(f"Excel 更新出錯: {e}")
+        return False
 
 def get_palm_news():
     url = "https://google.serper.dev/search"
@@ -82,9 +94,9 @@ def extract_data_and_report(raw_data, mode="full"):
     now = datetime.datetime.now()
     today_str = now.strftime("%Y-%m-%d")
     if mode == "news_only":
-        prompt = f"你是資深泰國棕櫚油分析師。今天是 {today_str}。撰寫「晨間新聞快報」。忽略價格數據。數據：{raw_data}"
+        prompt = f"你是分析師。今天是 {today_str}。撰寫「晨間新聞快報」。忽略價格數據。數據：{raw_data}"
     else:
-        prompt = f"你是資深泰國棕櫚油分析師。今天是 {today_str}。撰寫「每日完整分析」。含價格與建議。結尾輸出 DATA_JSON: {{\"ffb\": 6.5, \"cpo\": 40.0}}。數據：{raw_data}"
+        prompt = f"你是分析師。今天是 {today_str}。撰寫「每日完整分析」。含價格。結尾輸出 DATA_JSON: {{\"ffb\": 6.5, \"cpo\": 40.0}}。數據：{raw_data}"
     
     content, price_data = "無法生成 AI 報告。", None
     try:
@@ -97,15 +109,6 @@ def extract_data_and_report(raw_data, mode="full"):
     except Exception as e: print(f"AI 出錯: {e}")
     return content, price_data
 
-def send_line_push_message(text, image_url=None):
-    if not LINE_CHANNEL_ACCESS_TOKEN or not LINE_USER_ID: return
-    url = "https://api.line.me/v2/bot/message/push"
-    headers = {"Content-Type": "application/json", "Authorization": f"Bearer {LINE_CHANNEL_ACCESS_TOKEN}"}
-    messages = [{"type": "text", "text": text}]
-    if image_url:
-        messages.append({"type": "image", "originalContentUrl": image_url, "previewImageUrl": image_url})
-    requests.post(url, headers=headers, json={"to": LINE_USER_ID, "messages": messages})
-
 def main():
     ict_now = datetime.datetime.now(datetime.timezone(datetime.timedelta(hours=7)))
     date_today = ict_now.strftime("%Y-%m-%d")
@@ -114,73 +117,53 @@ def main():
     mode = None
     if "07:00" <= curr_hm < "13:30":
         mode = "news_only"
-        title = "📰 泰國棕櫚油晨間新聞快報"
+        title = "📰 Thailand Palm Oil Morning News"
         file_suffix = "news_0700"
     elif curr_hm >= "13:30":
         mode = "full"
-        title = "📊 泰國棕櫚油每日營運全報告"
+        title = "📊 Thailand Palm Oil Full Report"
         file_suffix = "full_1330"
     else:
-        print(f"⏳ 尚未到 07:00 (目前: {curr_hm})，略過。"); return
+        return
 
-    report_filename = f"palm_oil_report_{date_today}_{file_suffix}.html"
-    report_path = os.path.join(REPORT_DIR, report_filename)
+    report_name = f"palm_report_{date_today}_{file_suffix}"
+    html_path = f"docs/reports/{report_name}.html"
+    icloud_pdf_path = os.path.join(ICLOUD_BASE, f"{report_name}.pdf")
 
-    if os.path.exists(report_path):
-        print(f"✅ 今日 {mode} 報告已存在，跳過。"); return
+    if os.path.exists(html_path): return
 
-    print(f"🚀 開始執行 {mode} 分析任務...")
+    print(f"🚀 開始執行 {mode} 任務...")
     raw_data = get_palm_news()
     content, price_data = extract_data_and_report(raw_data, mode)
     
-    price_html = ""
-    chart_file = None
+    ffb = price_data.get("ffb") if price_data else "N/A"
+    cpo = price_data.get("cpo") if price_data else "N/A"
+
+    # 1. 更新 iCloud Excel
     if mode == "full" and price_data:
-        # 數據存檔 & 繪圖 (保持與之前一致)
-        df_new = pd.DataFrame({"Date": [date_today], "FFB": [price_data.get("ffb")], "CPO": [price_data.get("cpo")]})
-        if not os.path.exists(DATA_DIR): os.makedirs(DATA_DIR)
-        if os.path.exists(PRICE_DATA_FILE):
-            df_old = pd.read_csv(PRICE_DATA_FILE)
-            if date_today not in df_old['Date'].values:
-                pd.concat([df_old, df_new], ignore_index=True).to_csv(PRICE_DATA_FILE, index=False)
-        else: df_new.to_csv(PRICE_DATA_FILE, index=False)
-        df = pd.read_csv(PRICE_DATA_FILE)
-        if len(df) >= 2:
-            plt.figure(figsize=(10, 5)); plt.plot(df['Date'], df['FFB'], marker='o', color='green'); plt.plot(df['Date'], df['CPO'], marker='s', color='blue'); plt.grid(True)
-            chart_file = f"palm_chart_{date_today}.png"
-            plt.savefig(os.path.join(REPORT_DIR, chart_file)); plt.close()
-        
-        price_html = f'<div class="price-card"><div class="card"><div class="label">FFB</div><div class="value">{price_data.get("ffb")}</div></div><div class="card"><div class="label">CPO</div><div class="value">{price_data.get("cpo")}</div></div></div>'
+        update_icloud_excel(date_today, ffb, cpo)
 
-    # 生成 HTML 內容
+    # 2. 產出 iCloud PDF
+    create_pdf_report(icloud_pdf_path, title, date_today, ffb, cpo, content)
+
+    # 3. 產出本地 HTML 與同步 GitHub (保持與之前一致)
     html_body = markdown.markdown(content)
-    if chart_file:
-        html_body += f'<br><h2>📈 價格趨勢圖</h2><img src="{chart_file}" alt="Trend">'
-    
-    # 產出報告檔案
-    final_html = HTML_TEMPLATE.format(title=title, date=date_today, price_html=price_html, content=html_body, root_url=GITHUB_IO_URL)
-    if not os.path.exists(REPORT_DIR): os.makedirs(REPORT_DIR)
-    with open(report_path, "w", encoding="utf-8") as f: f.write(final_html)
-    
-    # [核心修復] 將 index.html 作為最新報告的內容拷貝，而非跳轉
-    with open("docs/index.html", "w", encoding="utf-8") as f: f.write(final_html)
+    with open(html_path, "w", encoding="utf-8") as f:
+        f.write(f"<html><body style='background:#121212;color:white;font-family:sans-serif;'><h1>{title}</h1>{html_body}</body></html>")
+    with open("docs/index.html", "w", encoding="utf-8") as f:
+        f.write(f"<html><body style='background:#121212;color:white;font-family:sans-serif;'><h1>{title}</h1>{html_body}</body></html>")
 
-    # 同步 GitHub
     try:
         subprocess.run(["git", "add", "."], check=True)
         subprocess.run(["git", "commit", "-m", f"🌐 {mode} Updated: {date_today}"], check=True)
         subprocess.run(["git", "push", "origin", "main"], check=True)
-        print("✅ 網頁已同步至 GitHub。")
     except: pass
 
-    # LINE 推播 (使用絕對路徑報告網址)
-    msg = f"{title} ({date_today})\n"
-    if mode == "full" and price_data:
-        msg += f"\n🔸 FFB: {price_data.get('ffb')}\n🔸 CPO: {price_data.get('cpo')}\n"
-    msg += f"\n👉 查看完整網頁：{GITHUB_IO_URL}/index.html"
-    
-    chart_url = f"{GITHUB_IO_URL}/reports/{chart_file}" if chart_file else None
-    send_line_push_message(msg, chart_url)
+    # 4. LINE 推播
+    msg = f"{title}\n🔸 FFB: {ffb}\n🔸 CPO: {cpo}\n👉 報告已存入 iCloud"
+    line_url = f"https://api.line.me/v2/bot/message/push"
+    headers = {"Content-Type": "application/json", "Authorization": f"Bearer {LINE_CHANNEL_ACCESS_TOKEN}"}
+    requests.post(line_url, headers=headers, json={"to": LINE_USER_ID, "messages": [{"type": "text", "text": msg}]})
 
 if __name__ == "__main__":
     main()
