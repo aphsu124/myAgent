@@ -107,7 +107,12 @@ def update_icloud_excel(date_str, ffb, cpo):
 def get_palm_news():
     url = "https://google.serper.dev/search"
     now = datetime.datetime.now(); today = now.strftime("%Y-%m-%d")
-    queries = [f"Thailand palm oil price Krabi {today}", f"Thailand Ministry of Commerce palm oil policy {now.strftime('%B %Y')}"]
+    # 強化負向過濾，排除旅遊資訊
+    queries = [
+        f"Thailand palm oil FFB CPO price Krabi {today} -travel -tourism -hotel",
+        f"Thailand Ministry of Commerce palm oil policy {now.strftime('%B %Y')} -beach -resort",
+        f"Thailand crude palm oil market analysis industry news {today}"
+    ]
     headers = {'X-API-KEY': SERPER_API_KEY, 'Content-Type': 'application/json'}
     res = ""
     for q in queries:
@@ -122,7 +127,20 @@ def get_palm_news():
 
 def extract_data_and_report(raw_data, mode="full"):
     now = datetime.datetime.now(); today_str = now.strftime("%Y-%m-%d")
-    prompt = f"你是資深分析師。今天是 {today_str}。撰寫繁體中文「{'晨間新聞快報' if mode=='news_only' else '每日分析報告'}」。結尾輸出 DATA_JSON: {{\"ffb\": 6.5, \"cpo\": 40.0}}。數據：{raw_data}"
+    
+    # 強化 AI 指令：嚴禁觀光內容
+    prompt = f"""
+    你是一位資深的泰國棕櫚油產業策略師。今天是 {today_str}。
+    請根據數據撰寫「{'晨間新聞快報' if mode=='news_only' else '每日完整分析報告'}」。
+    
+    【核心規則】：
+    1. 你的受眾是甲米壓榨廠的老闆，內容必須 100% 專注於棕櫚油產業、農業政策與市場價格。
+    2. 嚴格禁止提及任何關於「旅遊」、「觀光」、「酒店」、「海灘」或與農業無關的 Krabi 資訊。
+    3. 如果搜尋結果包含非產業資訊，請自動過濾並忽略。
+    4. 結尾必須輸出 DATA_JSON: {{"ffb": 6.5, "cpo": 40.0}}。
+    
+    數據：{raw_data}
+    """
     content, price_data = "無法生成 AI 報告。", {"ffb": "N/A", "cpo": "N/A"}
     try:
         resp = client.models.generate_content(model="gemini-2.5-flash", contents=prompt)
