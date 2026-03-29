@@ -42,10 +42,15 @@ HTML_TEMPLATE = """
         .card .value {{ font-size: 2em; font-weight: bold; color: #fff; }}
         img {{ max-width: 100%; border-radius: 8px; margin: 20px 0; border: 1px solid #333; }}
         .footer {{ text-align: center; margin-top: 50px; color: #666; font-size: 0.8em; }}
+        .nav-links {{ text-align: center; margin-bottom: 20px; }}
+        .nav-links a {{ color: #4CAF50; margin: 0 10px; text-decoration: none; font-weight: bold; }}
     </style>
 </head>
 <body>
     <div class="container">
+        <div class="nav-links">
+            <a href="{root_url}/index.html">🏠 回到今日最新</a>
+        </div>
         <h1>{title}</h1>
         <p style="color: #666;">執行日期：{date}</p>
         {price_html}
@@ -64,7 +69,7 @@ def get_palm_news():
     headers = {'X-API-KEY': SERPER_API_KEY, 'Content-Type': 'application/json'}
     res = ""
     for q in queries:
-        payload = {"q": q, "gl": "th", "hl": "en", "tbs": "qdr:m"} # 過去一個月
+        payload = {"q": q, "gl": "th", "hl": "en", "tbs": "qdr:m"}
         try:
             r = requests.post(url, headers=headers, json=payload)
             if r.status_code == 200:
@@ -76,11 +81,10 @@ def get_palm_news():
 def extract_data_and_report(raw_data, mode="full"):
     now = datetime.datetime.now()
     today_str = now.strftime("%Y-%m-%d")
-    
     if mode == "news_only":
-        prompt = f"你是資深泰國棕櫚油產業分析師。今天是 {today_str}。請根據數據撰寫「晨間新聞快報」。重點在於今日局勢預測與最新政策。忽略價格數據。數據：{raw_data}"
+        prompt = f"你是資深泰國棕櫚油分析師。今天是 {today_str}。撰寫「晨間新聞快報」。忽略價格數據。數據：{raw_data}"
     else:
-        prompt = f"你是資深泰國棕櫚油產業分析師。今天是 {today_str}。請根據數據撰寫「每日完整分析」。包含價格預估與經營建議。結尾輸出 DATA_JSON: {{\"ffb\": 6.5, \"cpo\": 40.0}}。數據：{raw_data}"
+        prompt = f"你是資深泰國棕櫚油分析師。今天是 {today_str}。撰寫「每日完整分析」。含價格與建議。結尾輸出 DATA_JSON: {{\"ffb\": 6.5, \"cpo\": 40.0}}。數據：{raw_data}"
     
     content, price_data = "無法生成 AI 報告。", None
     try:
@@ -107,34 +111,32 @@ def main():
     date_today = ict_now.strftime("%Y-%m-%d")
     curr_hm = ict_now.strftime("%H:%M")
     
-    # 時段判斷邏輯
     mode = None
     if "07:00" <= curr_hm < "13:30":
         mode = "news_only"
-        filename = f"docs/reports/news_0700_{date_today}.html"
         title = "📰 泰國棕櫚油晨間新聞快報"
+        file_suffix = "news_0700"
     elif curr_hm >= "13:30":
         mode = "full"
-        filename = f"docs/reports/full_1330_{date_today}.html"
         title = "📊 泰國棕櫚油每日營運全報告"
+        file_suffix = "full_1330"
     else:
-        print(f"⏳ 尚未到泰國 07:00 (目前: {curr_hm})，略過。")
-        return
+        print(f"⏳ 尚未到 07:00 (目前: {curr_hm})，略過。"); return
 
-    # 防重複檢查
-    if os.path.exists(filename):
-        print(f"✅ 今日 {mode} 報告已存在，跳過。")
-        return
+    report_filename = f"palm_oil_report_{date_today}_{file_suffix}.html"
+    report_path = os.path.join(REPORT_DIR, report_filename)
+
+    if os.path.exists(report_path):
+        print(f"✅ 今日 {mode} 報告已存在，跳過。"); return
 
     print(f"🚀 開始執行 {mode} 分析任務...")
     raw_data = get_palm_news()
     content, price_data = extract_data_and_report(raw_data, mode)
     
-    # 處理價格與繪圖 (僅限 full 模式)
     price_html = ""
     chart_file = None
     if mode == "full" and price_data:
-        # 存入數據
+        # 數據存檔 & 繪圖 (保持與之前一致)
         df_new = pd.DataFrame({"Date": [date_today], "FFB": [price_data.get("ffb")], "CPO": [price_data.get("cpo")]})
         if not os.path.exists(DATA_DIR): os.makedirs(DATA_DIR)
         if os.path.exists(PRICE_DATA_FILE):
@@ -142,45 +144,40 @@ def main():
             if date_today not in df_old['Date'].values:
                 pd.concat([df_old, df_new], ignore_index=True).to_csv(PRICE_DATA_FILE, index=False)
         else: df_new.to_csv(PRICE_DATA_FILE, index=False)
-        # 繪圖
         df = pd.read_csv(PRICE_DATA_FILE)
         if len(df) >= 2:
             plt.figure(figsize=(10, 5)); plt.plot(df['Date'], df['FFB'], marker='o', color='green'); plt.plot(df['Date'], df['CPO'], marker='s', color='blue'); plt.grid(True)
             chart_file = f"palm_chart_{date_today}.png"
             plt.savefig(os.path.join(REPORT_DIR, chart_file)); plt.close()
         
-        price_html = f"""
-        <div class="price-card">
-            <div class="card"><div class="label">FFB 收購價</div><div class="value">{price_data.get('ffb')}</div></div>
-            <div class="card"><div class="label">CPO 銷售價</div><div class="value">{price_data.get('cpo')}</div></div>
-        </div>
-        """
+        price_html = f'<div class="price-card"><div class="card"><div class="label">FFB</div><div class="value">{price_data.get("ffb")}</div></div><div class="card"><div class="label">CPO</div><div class="value">{price_data.get("cpo")}</div></div></div>'
 
-    # 生成 HTML
+    # 生成 HTML 內容
     html_body = markdown.markdown(content)
     if chart_file:
         html_body += f'<br><h2>📈 價格趨勢圖</h2><img src="{chart_file}" alt="Trend">'
     
-    final_html = HTML_TEMPLATE.format(title=title, date=date_today, price_html=price_html, content=html_body)
+    # 產出報告檔案
+    final_html = HTML_TEMPLATE.format(title=title, date=date_today, price_html=price_html, content=html_body, root_url=GITHUB_IO_URL)
     if not os.path.exists(REPORT_DIR): os.makedirs(REPORT_DIR)
-    with open(filename, "w", encoding="utf-8") as f: f.write(final_html)
+    with open(report_path, "w", encoding="utf-8") as f: f.write(final_html)
     
-    # 更新首頁索引 (docs/index.html)
-    with open("docs/index.html", "w", encoding="utf-8") as f:
-        f.write(f'<html><head><meta http-equiv="refresh" content="0; url=reports/{os.path.basename(filename)}"></head></html>')
+    # [核心修復] 將 index.html 作為最新報告的內容拷貝，而非跳轉
+    with open("docs/index.html", "w", encoding="utf-8") as f: f.write(final_html)
 
     # 同步 GitHub
     try:
         subprocess.run(["git", "add", "."], check=True)
         subprocess.run(["git", "commit", "-m", f"🌐 {mode} Updated: {date_today}"], check=True)
         subprocess.run(["git", "push", "origin", "main"], check=True)
+        print("✅ 網頁已同步至 GitHub。")
     except: pass
 
-    # LINE 推播
+    # LINE 推播 (使用絕對路徑報告網址)
     msg = f"{title} ({date_today})\n"
     if mode == "full" and price_data:
         msg += f"\n🔸 FFB: {price_data.get('ffb')}\n🔸 CPO: {price_data.get('cpo')}\n"
-    msg += f"\n👉 查看完整網頁：{GITHUB_IO_URL}/reports/{os.path.basename(filename)}"
+    msg += f"\n👉 查看完整網頁：{GITHUB_IO_URL}/index.html"
     
     chart_url = f"{GITHUB_IO_URL}/reports/{chart_file}" if chart_file else None
     send_line_push_message(msg, chart_url)
