@@ -174,7 +174,11 @@ def main():
     except: pass
 
     # 4. LINE 推播
-    msg = f"{title}\n🔸 FFB: {price_data.get('ffb')}\n🔸 CPO: {price_data.get('cpo')}\n👉 報告 {report_name} 已存入 iCloud"
+    msg = f"{title} ({date_display})\n"
+    msg += f"🔸 FFB: {price_data.get('ffb')} Baht/kg\n"
+    msg += f"🔸 CPO: {price_data.get('cpo')} Baht/kg\n"
+    msg += f"\n👉 查看完整網頁：{GITHUB_IO_URL}/index.html"
+    msg += f"\n📂 已同步至 iCloud: {report_name}.pdf"
     line_url = f"https://api.line.me/v2/bot/message/push"
     headers = {"Content-Type": "application/json", "Authorization": f"Bearer {LINE_CHANNEL_ACCESS_TOKEN}"}
     requests.post(line_url, headers=headers, json={"to": LINE_USER_ID, "messages": [{"type": "text", "text": msg}]})
