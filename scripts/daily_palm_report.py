@@ -205,7 +205,12 @@ def main():
         subprocess.run(["git", "commit", "-m", f"📊 Update {date_fn}"], check=True)
         subprocess.run(["git", "push", "origin", "main"], check=True)
     except: pass
-    msg = f"{title} ({date_ds})\n🔸 FFB: {data.get('ffb')}\n🔸 CPO: {data.get('cpo')}\n🔸 基差: {basis}\n👉 網頁與 iCloud 已更新"
+    msg = f"{title} ({date_ds})\n"
+    msg += f"🔸 FFB: {data.get('ffb')} Baht/kg\n"
+    msg += f"🔸 CPO: {data.get('cpo')} Baht/kg\n"
+    msg += f"🔸 基差: {basis} Baht/kg\n"
+    msg += f"\n👉 查看網頁：{GITHUB_IO_URL}/index.html"
+    msg += f"\n📂 iCloud 已同步: {date_fn}_{suffix}.pdf"
     requests.post(f"https://api.line.me/v2/bot/message/push", headers={"Content-Type": "application/json", "Authorization": f"Bearer {LINE_CHANNEL_ACCESS_TOKEN}"}, json={"to": LINE_USER_ID, "messages": [{"type": "text", "text": msg}]})
 
 if __name__ == "__main__":
