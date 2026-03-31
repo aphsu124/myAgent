@@ -3,29 +3,30 @@
 ## 📅 最後更新日期：2026-03-31
 
 ### 1. 專案核心架構 (System Core)
-- **AI 引擎**：Gemini 2.5-Flash (分析/翻譯) + OpenAI Whisper-1 (轉錄)。
+- **AI 引擎**：Gemini 2.5-Flash (分析與翻譯) + OpenAI Whisper-1 (轉錄)。
 - **自動化邏輯**：
-    - 晨報 (M) / 日報 (D) 自動排程 (07:00 / 13:30 ICT)。
-    - 基差監控：CPO 現貨 vs BMD 期貨。
-- **數據呈現**：GitHub Pages 網站 + iCloud 歸檔。
+    - 晨報 (M)：07:00 ICT (泰國時間)，專注政策與局勢。
+    - 日報 (D)：13:30 ICT (泰國時間)，整合價格與基差分析。
+- **手機推播**：LINE Messaging API (穩定推播、時段鎖定、防重複發送)。
+- **雲端呈現**：GitHub Pages 網站 與 iCloud 專業歸檔。
 
-### 2. 檔案與報表規範 (Standardized)
-- **命名**：`YYYYMMDD_[M/D]_report` (例如：20260331_D_report)。
-- **Excel**：`palm_oil_history.xlsx` (14 號大字版、內建公式與術語指南)。
-- **趨勢圖**：`2026_Palm_Oil_Trend_Master.png` (包含基差分析與大事記標註)。
+### 2. Excel 數據管理 (Ultimate Standard)
+- **檔案**：`palm_oil_history.xlsx` (位於 iCloud)。
+- **樣式規範**：
+    - 字體：14 號微軟正黑體。
+    - 欄寬：A(25), D(22), E(22), J(110) 確保文字不擠壓。
+- **教學功能**：
+    - 右側藍色指南區包含 BMD_MYR (馬幣期貨)、BMD_THB_kg (泰銖折算) 等所有術語的定義與計算算式。
+- **數據完整性**：已重建 2026 全年至今數據，包含手動補齊 3/29 與 3/30 紀錄。
 
-### 3. 手機遙控開發紀錄 (Research & Debugging)
-- **網路環境分析**：當前網路環境具備強大的入站過濾與長連線偵測，不建議繼續嘗試 LINE/Discord。
-- **已部署工具**：`scripts/line_server.py`, `scripts/discord_bot.py`, `scripts/telegram_bot.py` (皆已完成邏輯開發，待硬體環境更換後可直接啟用)。
-- **保底方案**：**iCloud 指令信箱法** (透過 `scripts/remote_watcher.py` 監控 `CMD.txt`) 為目前最穩定之遠端觸發手段。
+### 3. 會議錄音處理分支
+- **腳本**：`scripts/process_meeting.py`。
+- **功能**：語音轉錄 -> 中文摘要 -> 泰文逐字稿存檔 -> 商務單字本 PDF 更新。
+- **單字本**：`泰國商務單字本_最新版.pdf` (Matplotlib 渲染，CTL 完美顯示)。
 
-### 4. 會議錄音分支 (Operational)
-- **路徑**：`iCloud/會議/錄音` -> `摘要/` + `逐字稿/`。
-- **單字本**：`泰國商務單字本_最新版.pdf` (自動累積、不顯示次數、完美泰文渲染)。
-
-### 5. API 配置 (.env)
-- `GEMINI_API_KEY`, `SERPER_API_KEY`, `OPENAI_API_KEY`
-- `LINE_CHANNEL_ACCESS_TOKEN`, `LINE_USER_ID`, `TELEGRAM_BOT_TOKEN`, `DISCORD_BOT_TOKEN`
+### 4. 關鍵維護紀錄
+- **連線嘗試**：已測試 LINE Webhook、Discord Bot 與 Telegram，確認目前網路環境對外部連入有強大阻斷，建議維持目前的單向推播與排程模式。
+- **檔案命名**：統一採用 `YYYYMMDD_[M/D]_report` 格式。
 
 ---
-**Jarvis 隨時待命。核心功能已固若金湯，手機遙控將於硬體遷移時再行優化。**
+**Jarvis 隨時待命。系統已進入高度穩定且標準化的運行階段。**
