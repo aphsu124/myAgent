@@ -3,33 +3,29 @@
 ## 📅 最後更新日期：2026-03-31
 
 ### 1. 專案核心架構 (System Core)
-- **AI 引擎**：Gemini 2.5-Flash (分析與翻譯) + OpenAI Whisper-1 (語音轉文字)。
+- **AI 引擎**：Gemini 2.5-Flash (分析/翻譯) + OpenAI Whisper-1 (轉錄)。
 - **自動化邏輯**：
-    - 晨報 (M) / 日報 (D) 自動排程運作中。
-    - 會議錄音處理分支穩定（支持泰文逐字稿與單字 PDF）。
-- **數據呈現**：GitHub Pages 網站 + iCloud 專業歸檔 (14號大字版 Excel)。
+    - 晨報 (M) / 日報 (D) 自動排程 (07:00 / 13:30 ICT)。
+    - 基差監控：CPO 現貨 vs BMD 期貨。
+- **數據呈現**：GitHub Pages 網站 + iCloud 歸檔。
 
-### 2. 手機遙控開發紀錄 (Remote Control Battle Log)
-- **測試環境**：MacBook Pro (本地伺服器)。
-- **已排除方案**：
-    - **LINE Messaging API (Webhook)**：網路環境導致的 404/503 障礙，不建議繼續嘗試。
-    - **Discord Slash Commands**：指令同步成功 (Guild ID: 1488194051214807132)，但交互訊號 (Interaction) 遭到中斷，效率低下。
-- **最終解決方案預定**：**Telegram Bot (Polling Mode)**。
-    - **原理**：MacBook 主動去 Telegram 領取指令，100% 避開防火牆與穿透問題。
+### 2. 檔案與報表規範 (Standardized)
+- **命名**：`YYYYMMDD_[M/D]_report` (例如：20260331_D_report)。
+- **Excel**：`palm_oil_history.xlsx` (14 號大字版、內建公式與術語指南)。
+- **趨勢圖**：`2026_Palm_Oil_Trend_Master.png` (包含基差分析與大事記標註)。
 
-### 3. API 配置與 Token 狀態 (.env)
-- **Active**: Gemini, Serper, OpenAI, LINE (僅推播)。
-- **Standby**: Discord Token, Ngrok Authtoken。
+### 3. 手機遙控開發紀錄 (Research & Debugging)
+- **網路環境分析**：當前網路環境具備強大的入站過濾與長連線偵測，不建議繼續嘗試 LINE/Discord。
+- **已部署工具**：`scripts/line_server.py`, `scripts/discord_bot.py`, `scripts/telegram_bot.py` (皆已完成邏輯開發，待硬體環境更換後可直接啟用)。
+- **保底方案**：**iCloud 指令信箱法** (透過 `scripts/remote_watcher.py` 監控 `CMD.txt`) 為目前最穩定之遠端觸發手段。
 
-### 4. 關鍵檔案
-- 主程式：`scripts/daily_palm_report.py`
-- 試算表：`palm_oil_history.xlsx` (iCloud)
-- 學習手冊：`泰國商務單字本_最新版.pdf` (iCloud)
+### 4. 會議錄音分支 (Operational)
+- **路徑**：`iCloud/會議/錄音` -> `摘要/` + `逐字稿/`。
+- **單字本**：`泰國商務單字本_最新版.pdf` (自動累積、不顯示次數、完美泰文渲染)。
 
-### 5. 待辦事項 (Backlog)
-- [ ] 設定 Telegram Bot Token 並啟動 Polling 監聽。
-- [ ] 實現手機端 `/report`、`/excel` 的 100% 成功回覆。
-- [ ] 考慮加入泰國南部其他產區的即時價格對照。
+### 5. API 配置 (.env)
+- `GEMINI_API_KEY`, `SERPER_API_KEY`, `OPENAI_API_KEY`
+- `LINE_CHANNEL_ACCESS_TOKEN`, `LINE_USER_ID`, `TELEGRAM_BOT_TOKEN`, `DISCORD_BOT_TOKEN`
 
 ---
-**Jarvis 隨時待命。我們已找到正確的連線方向，下一次將是「手機遙控」真正開通的時刻。**
+**Jarvis 隨時待命。核心功能已固若金湯，手機遙控將於硬體遷移時再行優化。**

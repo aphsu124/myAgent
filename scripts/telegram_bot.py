@@ -1,50 +1,52 @@
 import os
-import subprocess
-import time
 import requests
+import time
+import subprocess
 from dotenv import load_dotenv
 
 load_dotenv()
-TOKEN = os.getenv("TELEGRAM_BOT_TOKEN")
-ICLOUD_BASE = "/Users/bucksteam/Library/Mobile Documents/com~apple~CloudDocs/泰國/工作/甲米油廠/簡報"
-
-def get_updates(offset=None):
-    url = f"https://api.telegram.org/bot{TOKEN}/getUpdates"
-    params = {"timeout": 10, "offset": offset}
-    try:
-        r = requests.get(url, params=params, timeout=15)
-        return r.json()
-    except:
-        return None
-
-def send_message(chat_id, text):
-    url = f"https://api.telegram.org/bot{TOKEN}/sendMessage"
-    requests.post(url, data={"chat_id": chat_id, "text": text})
+TOKEN = "8742999308:AAGnTs71g-2JmKc21Ifw1fS_DtnfOg-PYFo"
+OFFSET_FILE = "data/tg_offset.txt"
 
 def main():
-    print("🚀 啟動 [高頻率暴力監聽版] Telegram 助手...")
-    last_update_id = None
-    
+    print("🚀 [Jarvis 實時監聽] 啟動成功！我正在聽您的每一句話...")
+    offset = 0
+    if os.path.exists(OFFSET_FILE):
+        with open(OFFSET_FILE, "r") as f: offset = int(f.read().strip())
+
     while True:
-        # 每次循環都是一次全新的 HTTP 請求，徹底避開長連線阻斷問題
-        updates = get_updates(last_update_id)
-        
-        if updates and updates.get("ok"):
-            for update in updates.get("result", []):
-                last_update_id = update["update_id"] + 1
-                msg = update.get("message", {})
-                chat_id = msg.get("chat", {}).get("id")
-                text = msg.get("text", "")
-                
-                if text == "/report":
-                    send_message(chat_id, "📊 收到！正在生成報告...")
-                    subprocess.run(["python3", "scripts/daily_palm_report.py"])
-                    send_message(chat_id, "✅ 報告已產出！")
-                elif text == "/ping":
-                    send_message(chat_id, "🏓 Pong! 本次連線成功。")
-        
-        # 休息 2 秒後立即發起下一次全新連線
-        time.sleep(2)
+        try:
+            # 1. 抓取訊息
+            url = f"https://api.telegram.org/bot{TOKEN}/getUpdates"
+            r = requests.get(url, params={"offset": offset, "timeout": 20}, timeout=25)
+            
+            if r.status_code == 200:
+                data = r.json()
+                if data.get("ok") and data.get("result"):
+                    for update in data["result"]:
+                        msg = update.get("message", {})
+                        text = msg.get("text", "")
+                        chat_id = msg.get("chat", {}).get("id")
+                        offset = update["update_id"] + 1
+                        
+                        # 紀錄最後讀取位置
+                        with open(OFFSET_FILE, "w") as f: f.write(str(offset))
+                        
+                        print(f"📩 收到指令: [{text}]")
+                        
+                        # 2. 邏輯處理
+                        if text == "/ping":
+                            requests.post(f"https://api.telegram.org/bot{TOKEN}/sendMessage", data={"chat_id": chat_id, "text": "🏓 **Jarvis 在線！** 連線非常穩定。"})
+                        elif text == "/report":
+                            requests.post(f"https://api.telegram.org/bot{TOKEN}/sendMessage", data={"chat_id": chat_id, "text": "📊 收到！正在生成報告..."})
+                            subprocess.run(["python3", "scripts/daily_palm_report.py"])
+                            requests.post(f"https://api.telegram.org/bot{TOKEN}/sendMessage", data={"chat_id": chat_id, "text": "✅ 報告已產出！"})
+            
+        except Exception as e:
+            print(f"⚠️ 連線小波動: {e}")
+            time.sleep(2) # 發生錯誤休息一下再繼續，絕不停止
+            
+        time.sleep(0.5) # 極速循環
 
 if __name__ == "__main__":
     main()
