@@ -1,0 +1,58 @@
+[2026-03-31 00:06:17] [INFO    ] discord.client: logging in using static token
+[2026-03-31 00:06:19] [INFO    ] discord.gateway: Shard ID None has connected to Gateway (Session ID: e8a015f047287323c6d13fa890d420b4).
+[2026-03-31 00:19:48] [INFO    ] discord.client: logging in using static token
+[2026-03-31 00:19:50] [INFO    ] discord.gateway: Shard ID None has connected to Gateway (Session ID: 54def1eb22518fd9a12f0545693f7b58).
+[2026-03-31 00:22:36] [INFO    ] discord.client: logging in using static token
+[2026-03-31 00:22:37] [INFO    ] discord.gateway: Shard ID None has connected to Gateway (Session ID: 5f9eeba08a875d71e5cec78fd34a67c1).
+[2026-03-31 00:24:27] [INFO    ] discord.client: logging in using static token
+[2026-03-31 00:24:28] [INFO    ] discord.gateway: Shard ID None has connected to Gateway (Session ID: 47dceb8677d714a1550050216c68839f).
+[2026-03-31 00:30:01] [INFO    ] discord.client: logging in using static token
+Traceback (most recent call last):
+  File "/Users/bucksteam/Library/Python/3.9/lib/python/site-packages/discord/http.py", line 844, in static_login
+    data = await self.request(Route('GET', '/users/@me'))
+  File "/Users/bucksteam/Library/Python/3.9/lib/python/site-packages/discord/http.py", line 778, in request
+    raise HTTPException(response, data)
+discord.errors.HTTPException: 401 Unauthorized (error code: 0): 401: Unauthorized
+
+The above exception was the direct cause of the following exception:
+
+Traceback (most recent call last):
+  File "/Users/bucksteam/myAgent/scripts/discord_bot.py", line 36, in <module>
+    bot.run(TOKEN)
+  File "/Users/bucksteam/Library/Python/3.9/lib/python/site-packages/discord/client.py", line 933, in run
+    asyncio.run(runner())
+  File "/Library/Developer/CommandLineTools/Library/Frameworks/Python3.framework/Versions/3.9/lib/python3.9/asyncio/runners.py", line 44, in run
+    return loop.run_until_complete(main)
+  File "/Library/Developer/CommandLineTools/Library/Frameworks/Python3.framework/Versions/3.9/lib/python3.9/asyncio/base_events.py", line 642, in run_until_complete
+    return future.result()
+  File "/Users/bucksteam/Library/Python/3.9/lib/python/site-packages/discord/client.py", line 922, in runner
+    await self.start(token, reconnect=reconnect)
+  File "/Users/bucksteam/Library/Python/3.9/lib/python/site-packages/discord/client.py", line 850, in start
+    await self.login(token)
+  File "/Users/bucksteam/Library/Python/3.9/lib/python/site-packages/discord/client.py", line 679, in login
+    data = await self.http.static_login(token)
+  File "/Users/bucksteam/Library/Python/3.9/lib/python/site-packages/discord/http.py", line 848, in static_login
+    raise LoginFailure('Improper token has been passed.') from exc
+discord.errors.LoginFailure: Improper token has been passed.
+[2026-03-31 00:30:50] [INFO    ] discord.client: logging in using static token
+[2026-03-31 00:30:52] [INFO    ] discord.gateway: Shard ID None has connected to Gateway (Session ID: 41c4a1aabf24f7d96562083e9513a7ee).
+[2026-03-31 00:33:01] [INFO    ] discord.client: logging in using static token
+[2026-03-31 00:33:03] [INFO    ] discord.gateway: Shard ID None has connected to Gateway (Session ID: a0db859623c9d242330f688ba5f103a8).
+[2026-03-31 00:41:46] [INFO    ] discord.client: logging in using static token
+[2026-03-31 00:41:47] [INFO    ] discord.gateway: Shard ID None has connected to Gateway (Session ID: 917440f948d17a995dc0646bac57ee19).
+[2026-03-31 00:49:46] [INFO    ] discord.client: logging in using static token
+[2026-03-31 00:49:48] [INFO    ] discord.gateway: Shard ID None has connected to Gateway (Session ID: e5488d3d889c64c787b25d4ee15ca8a4).
+[2026-03-31 00:53:04] [INFO    ] discord.client: logging in using static token
+[2026-03-31 00:53:06] [INFO    ] discord.gateway: Shard ID None has connected to Gateway (Session ID: 18ed24ce72aae98d1a6201ac837e9f94).
+[2026-03-31 00:56:21] [INFO    ] discord.client: logging in using static token
+[2026-03-31 00:56:22] [INFO    ] discord.gateway: Shard ID None has connected to Gateway (Session ID: a3774e6611a279a2cba0c280fa072c85).
+[2026-03-31 01:04:48] [INFO    ] discord.client: logging in using static token
+[2026-03-31 01:04:50] [INFO    ] discord.gateway: Shard ID None has connected to Gateway (Session ID: aa9016c6e36ee1453ff09e3751e1be1a).
+[2026-03-31 01:08:13] [INFO    ] discord.client: logging in using static token
+[2026-03-31 01:08:17] [INFO    ] discord.gateway: Shard ID None has connected to Gateway (Session ID: b34349c13f2c787091fce649bcad15fb).
+[2026-03-31 01:23:10] [INFO    ] discord.client: logging in using static token
+[2026-03-31 01:23:12] [INFO    ] discord.gateway: Shard ID None has connected to Gateway (Session ID: a6fae3b927cef0d62acd7ba5ac9d879e).
+[2026-03-31 01:28:13] [INFO    ] discord.client: logging in using static token
+[2026-03-31 01:28:14] [INFO    ] discord.gateway: Shard ID None has connected to Gateway (Session ID: 3a9363e175eba7b3cb14ec8024aecfa4).
+[2026-03-31 01:32:31] [INFO    ] discord.client: logging in using static token
+[2026-03-31 01:32:33] [INFO    ] discord.gateway: Shard ID None has connected to Gateway (Session ID: 1b074fc1b7375a2e2ff4dbe21d44a65c).

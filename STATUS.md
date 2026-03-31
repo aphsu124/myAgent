@@ -1,36 +1,35 @@
 # 🌴 泰國棕櫚油 AI 監控專案 - 現況紀錄 (Status Report)
 
-## 📅 最後更新日期：2026-03-30
+## 📅 最後更新日期：2026-03-31
 
 ### 1. 專案核心架構 (System Core)
-- **AI 引擎**：Gemini 2.5-Flash (分析與翻譯) + OpenAI Whisper-1 (錄音轉錄)。
-- **自動化邏輯**：07:00 晨報 (M) / 13:30 日報 (D)。
-- **通訊管道**：LINE Messaging API 24H 穩定推播。
-- **雲端呈現**：GitHub Pages 網站 + iCloud 專業歸檔。
+- **AI 引擎**：Gemini 2.5-Flash (分析與翻譯) + OpenAI Whisper-1 (語音轉文字)。
+- **自動化邏輯**：
+    - 晨報 (M) / 日報 (D) 自動排程運作中。
+    - 會議錄音處理分支穩定（支持泰文逐字稿與單字 PDF）。
+- **數據呈現**：GitHub Pages 網站 + iCloud 專業歸檔 (14號大字版 Excel)。
 
-### 2. 智慧油廠轉型提案 (Management Proposal)
-- **定稿文件**：`AI_Management_Proposal_V10.pdf` (位於 iCloud)。
-- **精確型號**：
-    - 伺服器：Apple Mac Mini (M4 Pro, MC6P3TA/A) / 48GB RAM。
-    - 供電：APC Back-UPS Pro BR1000G-TW。
-    - 影像：Hikvision DS-2CD2043G2-I (10台)。
-    - 網路：UniFi USW-Lite-16-PoE + U6-Lite。
-- **排版引擎**：ReportLab Platypus (確保多語言排版絕不重疊)。
+### 2. 手機遙控開發紀錄 (Remote Control Battle Log)
+- **測試環境**：MacBook Pro (本地伺服器)。
+- **已排除方案**：
+    - **LINE Messaging API (Webhook)**：網路環境導致的 404/503 障礙，不建議繼續嘗試。
+    - **Discord Slash Commands**：指令同步成功 (Guild ID: 1488194051214807132)，但交互訊號 (Interaction) 遭到中斷，效率低下。
+- **最終解決方案預定**：**Telegram Bot (Polling Mode)**。
+    - **原理**：MacBook 主動去 Telegram 領取指令，100% 避開防火牆與穿透問題。
 
-### 3. 數據庫與報表規範
-- **Excel 檔案**：`palm_oil_history.xlsx` (14號微軟正黑體、內建計算指南與公式說明)。
-- **趨勢圖**：`2026_Palm_Oil_Trend_Master.png` (包含 FFB, CPO, BMD 三線對比及大事記標註)。
-- **基差監控**：`Basis = CPO - (BMD/1000 * EX_Rate)`。
+### 3. API 配置與 Token 狀態 (.env)
+- **Active**: Gemini, Serper, OpenAI, LINE (僅推播)。
+- **Standby**: Discord Token, Ngrok Authtoken。
 
-### 4. 會議錄音處理邏輯
-- **主腳本**：`scripts/process_meeting.py`。
-- **功能**：泰文轉錄 -> 中文摘要 -> 泰文逐字稿存檔 -> 商務單字本 PDF 更新。
-- **分流機制**：針對標記檔案（如：品川）自動跳過單字更新，保持數據庫純淨。
+### 4. 關鍵檔案
+- 主程式：`scripts/daily_palm_report.py`
+- 試算表：`palm_oil_history.xlsx` (iCloud)
+- 學習手冊：`泰國商務單字本_最新版.pdf` (iCloud)
 
-### 5. 後續里程碑 (Next Milestones)
-- [ ] 採購 M4 Pro Mac Mini 並執行系統遷移。
-- [ ] 開發 LINE Webhook 伺服器實現手機指令回傳。
-- [ ] 整合 10 路影像辨識模型 (Phase 2)。
+### 5. 待辦事項 (Backlog)
+- [ ] 設定 Telegram Bot Token 並啟動 Polling 監聽。
+- [ ] 實現手機端 `/report`、`/excel` 的 100% 成功回覆。
+- [ ] 考慮加入泰國南部其他產區的即時價格對照。
 
 ---
-**Jarvis 隨時待命。系統已完成從「資料收集」到「決策支持」的初步轉型。**
+**Jarvis 隨時待命。我們已找到正確的連線方向，下一次將是「手機遙控」真正開通的時刻。**

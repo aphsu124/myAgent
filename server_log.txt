@@ -1,0 +1,80 @@
+[2026-03-30 17:43:09] 🌍 啟動 ngrok 通道: pharmacologic-johnathan-suboptical.ngrok-free.dev
+[2026-03-30 17:43:11] ✅ Webhook 網址就緒: NgrokTunnel: "https://pharmacologic-johnathan-suboptical.ngrok-free.dev" -> "http://localhost:5000"/callback
+[2026-03-30 17:43:09] 🌍 啟動 ngrok 通道: pharmacologic-johnathan-suboptical.ngrok-free.dev
+[2026-03-30 17:43:11] ✅ Webhook 網址就緒: NgrokTunnel: "https://pharmacologic-johnathan-suboptical.ngrok-free.dev" -> "http://localhost:5000"/callback
+ * Serving Flask app 'line_server'
+ * Debug mode: off
+[31m[1mWARNING: This is a development server. Do not use it in a production deployment. Use a production WSGI server instead.[0m
+ * Running on http://127.0.0.1:5000
+[33mPress CTRL+C to quit[0m
+[2026-03-30 18:02:31.148664] 🌍 萬能監聽網址: NgrokTunnel: "https://pharmacologic-johnathan-suboptical.ngrok-free.dev" -> "http://localhost:5000"
+🌍 萬能監聽網址: NgrokTunnel: "https://pharmacologic-johnathan-suboptical.ngrok-free.dev" -> "http://localhost:5000"
+ * Serving Flask app 'line_server'
+ * Debug mode: off
+[31m[1mWARNING: This is a development server. Do not use it in a production deployment. Use a production WSGI server instead.[0m
+ * Running on http://127.0.0.1:5000
+[33mPress CTRL+C to quit[0m
+ * Serving Flask app 'line_server'
+ * Debug mode: off
+[31m[1mWARNING: This is a development server. Do not use it in a production deployment. Use a production WSGI server instead.[0m
+ * Running on http://127.0.0.1:5000
+[33mPress CTRL+C to quit[0m
+ * Serving Flask app 'line_server'
+ * Debug mode: off
+[31m[1mWARNING: This is a development server. Do not use it in a production deployment. Use a production WSGI server instead.[0m
+ * Running on http://127.0.0.1:5000
+[33mPress CTRL+C to quit[0m
+ * Serving Flask app 'line_server'
+ * Debug mode: off
+[31m[1mWARNING: This is a development server. Do not use it in a production deployment. Use a production WSGI server instead.[0m
+ * Running on http://127.0.0.1:5000
+[33mPress CTRL+C to quit[0m
+ * Serving Flask app 'line_server'
+ * Debug mode: off
+[31m[1mWARNING: This is a development server. Do not use it in a production deployment. Use a production WSGI server instead.[0m
+ * Running on http://127.0.0.1:5000
+[33mPress CTRL+C to quit[0m
+ * Serving Flask app 'line_server'
+ * Debug mode: off
+[31m[1mWARNING: This is a development server. Do not use it in a production deployment. Use a production WSGI server instead.[0m
+ * Running on http://127.0.0.1:5000
+[33mPress CTRL+C to quit[0m
+ * Serving Flask app 'line_server'
+ * Debug mode: off
+[31m[1mWARNING: This is a development server. Do not use it in a production deployment. Use a production WSGI server instead.[0m
+ * Running on http://127.0.0.1:8888
+[33mPress CTRL+C to quit[0m
+ * Serving Flask app 'line_server'
+ * Debug mode: off
+[31m[1mWARNING: This is a development server. Do not use it in a production deployment. Use a production WSGI server instead.[0m
+ * Running on http://127.0.0.1:8888
+[33mPress CTRL+C to quit[0m
+ * Serving Flask app 'line_server'
+ * Debug mode: off
+[31m[1mWARNING: This is a development server. Do not use it in a production deployment. Use a production WSGI server instead.[0m
+ * Running on all addresses (0.0.0.0)
+ * Running on http://127.0.0.1:8888
+ * Running on http://192.168.1.2:8888
+[33mPress CTRL+C to quit[0m
+127.0.0.1 - - [30/Mar/2026 23:12:15] "HEAD / HTTP/1.1" 200 -
+ * Serving Flask app 'line_server'
+ * Debug mode: off
+[31m[1mWARNING: This is a development server. Do not use it in a production deployment. Use a production WSGI server instead.[0m
+ * Running on all addresses (0.0.0.0)
+ * Running on http://127.0.0.1:8888
+ * Running on http://192.168.1.2:8888
+[33mPress CTRL+C to quit[0m
+ * Serving Flask app 'line_server'
+ * Debug mode: off
+[31m[1mWARNING: This is a development server. Do not use it in a production deployment. Use a production WSGI server instead.[0m
+ * Running on all addresses (0.0.0.0)
+ * Running on http://127.0.0.1:8888
+ * Running on http://192.168.1.2:8888
+[33mPress CTRL+C to quit[0m
+ * Serving Flask app 'line_server'
+ * Debug mode: off
+[31m[1mWARNING: This is a development server. Do not use it in a production deployment. Use a production WSGI server instead.[0m
+ * Running on all addresses (0.0.0.0)
+ * Running on http://127.0.0.1:8888
+ * Running on http://192.168.1.2:8888
+[33mPress CTRL+C to quit[0m
