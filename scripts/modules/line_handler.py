@@ -8,7 +8,7 @@ def send_push_notification(title, date_str, ffb, cpo, basis):
     
     # 格式化數值
     disp_f = f"{ffb} Baht/kg" if str(ffb) != "N/A" and ffb != 0 else "市場未開盤"
-    disp_c = f"{cpo} Baht/kg" if str(cpo) != "N/A" and fpo != 0 else "市場未開盤"
+    disp_c = f"{cpo} Baht/kg" if str(cpo) != "N/A" and cpo != 0 else "市場未開盤"
     
     msg = f"{title} ({date_str})\n"
     msg += f"🔸 FFB: {disp_f}\n"
