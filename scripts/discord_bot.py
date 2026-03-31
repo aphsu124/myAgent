@@ -1,45 +1,39 @@
 import discord
+import logging
+import sys
 import os
 import subprocess
+from discord.ext import commands
 from dotenv import load_dotenv
 
-load_dotenv()
+# 日誌
+logging.basicConfig(level=logging.INFO, format='%(asctime)s:%(levelname)s:%(name)s: %(message)s', stream=sys.stdout)
+logger = logging.getLogger('discord')
+
+# 載入 .env
+base_dir = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+load_dotenv(os.path.join(base_dir, '.env'))
 TOKEN = os.getenv("DISCORD_BOT_TOKEN")
-GUILD_ID = 1488194051214807132
 
-class FinalJarvis(discord.Client):
-    def __init__(self):
-        super().__init__(intents=discord.Intents.all())
-        self.tree = discord.app_commands.CommandTree(self)
+intents = discord.Intents.all() # 暴力開啟所有權限
+bot = commands.Bot(command_prefix="!", intents=intents)
 
-    async def setup_hook(self):
-        guild = discord.Object(id=GUILD_ID)
-        self.tree.copy_global_to(guild=guild)
-        await self.tree.sync(guild=guild)
+@bot.event
+async def on_ready():
+    logger.info(f'✅ Jarvis 已重新上線: {bot.user}')
 
-    async def on_ready(self):
-        print(f"🚀 [系統報告] 機器人 {self.user} 已完全接通網關。")
-        print(f"📍 正在監聽伺服器: {GUILD_ID}")
-
-    async def on_interaction(self, interaction):
-        # 這是最底層的監聽，只要您按了按鈕，這裡一定會有反應
-        print(f"🔔 [偵測到訊號] 動作類型: {interaction.type} | 來自用戶: {interaction.user}")
-        if interaction.type == discord.InteractionType.application_command:
-            command_name = interaction.data['name']
-            print(f"🎯 指令名稱: {command_name}")
-            
-            if command_name == "ping":
-                await interaction.response.send_message("✅ **Jarvis 收到！** 訊號傳輸正常。")
-            elif command_name == "report":
-                await interaction.response.send_message("📊 **啟動日報生成程式...**")
-                subprocess.run(["python3", "scripts/daily_palm_report.py"])
-                await interaction.followup.send("🏁 報告已發布！")
-
-client = FinalJarvis()
+@bot.event
+async def on_message(message):
+    if message.author == bot.user: return
+    logger.info(f"📩 收到內容: [{message.content}] 來自: {message.author}")
+    if "!日報" in message.content:
+        await message.channel.send("📊 收到指令，開始執行...")
+        subprocess.run(["python3", os.path.join(base_dir, "scripts/daily_palm_report.py")])
+        await message.channel.send("✅ 完成！")
+    elif "!ping" in message.content:
+        await message.channel.send("🏓 Pong!")
+    await bot.process_commands(message)
 
 if __name__ == "__main__":
-    if TOKEN:
-        print("--- 正在啟動最終除錯服務 ---")
-        client.run(TOKEN)
-    else:
-        print("❌ 找不到 Token")
+    # 使用 reconnect=True 確保斷線自動重連
+    bot.run(TOKEN, reconnect=True)

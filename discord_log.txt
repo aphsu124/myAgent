@@ -56,3 +56,25 @@ discord.errors.LoginFailure: Improper token has been passed.
 [2026-03-31 01:28:14] [INFO    ] discord.gateway: Shard ID None has connected to Gateway (Session ID: 3a9363e175eba7b3cb14ec8024aecfa4).
 [2026-03-31 01:32:31] [INFO    ] discord.client: logging in using static token
 [2026-03-31 01:32:33] [INFO    ] discord.gateway: Shard ID None has connected to Gateway (Session ID: 1b074fc1b7375a2e2ff4dbe21d44a65c).
+2026-03-31 14:15:11,948:WARNING:discord.client: PyNaCl is not installed, voice will NOT be supported
+2026-03-31 14:15:11,950:WARNING:discord.client: davey is not installed, voice will NOT be supported
+2026-03-31 14:15:11,950:ERROR:discord: ❌ 找不到 DISCORD_BOT_TOKEN
+2026-03-31 14:15:55,434:WARNING:discord.client: PyNaCl is not installed, voice will NOT be supported
+2026-03-31 14:15:55,434:WARNING:discord.client: davey is not installed, voice will NOT be supported
+2026-03-31 14:15:55,434:ERROR:discord: ❌ 找不到 TOKEN (路徑: /Users/bucksteam/myAgent/.env)
+2026-03-31 14:16:43,565:WARNING:discord.client: PyNaCl is not installed, voice will NOT be supported
+2026-03-31 14:16:43,565:WARNING:discord.client: davey is not installed, voice will NOT be supported
+[2026-03-31 14:16:43] [INFO    ] discord.client: logging in using static token
+2026-03-31 14:16:43,566:INFO:discord.client: logging in using static token
+[2026-03-31 14:16:44] [INFO    ] discord.gateway: Shard ID None has connected to Gateway (Session ID: 95003b9f69fcce8420d54aec914f81aa).
+2026-03-31 14:16:44,954:INFO:discord.gateway: Shard ID None has connected to Gateway (Session ID: 95003b9f69fcce8420d54aec914f81aa).
+[2026-03-31 14:16:46] [INFO    ] discord: ✅ Jarvis 已上線: Jarvis#7302
+2026-03-31 14:16:46,957:INFO:discord: ✅ Jarvis 已上線: Jarvis#7302
+2026-03-31 14:21:11,940:WARNING:discord.client: PyNaCl is not installed, voice will NOT be supported
+2026-03-31 14:21:11,940:WARNING:discord.client: davey is not installed, voice will NOT be supported
+[2026-03-31 14:21:11] [INFO    ] discord.client: logging in using static token
+2026-03-31 14:21:11,941:INFO:discord.client: logging in using static token
+[2026-03-31 14:21:13] [INFO    ] discord.gateway: Shard ID None has connected to Gateway (Session ID: 5db984f5707b80bf2b12b9f236fa4112).
+2026-03-31 14:21:13,152:INFO:discord.gateway: Shard ID None has connected to Gateway (Session ID: 5db984f5707b80bf2b12b9f236fa4112).
+[2026-03-31 14:21:15] [INFO    ] discord: ✅ Jarvis 已重新上線: Jarvis#7302
+2026-03-31 14:21:15,154:INFO:discord: ✅ Jarvis 已重新上線: Jarvis#7302
