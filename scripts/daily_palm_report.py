@@ -38,7 +38,7 @@ def main():
     else: return
 
     html_path = os.path.join(config.REPORT_DIR, f"{date_fn}_{suffix}.html")
-    if False: return
+    if os.path.exists(html_path): return
 
     print(f"🚀 啟動 {mode} 任務...")
     raw_data = get_palm_news(date_ds)
