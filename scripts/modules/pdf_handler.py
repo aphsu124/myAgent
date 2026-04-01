@@ -2,7 +2,7 @@ import os
 from reportlab.lib import colors
 from reportlab.lib.pagesizes import A4
 from reportlab.lib.styles import getSampleStyleSheet, ParagraphStyle
-from reportlab.platypus import SimpleDocTemplate, Paragraph, Spacer, HRFlowable, KeepTogether, Table, TableStyle
+from reportlab.platypus import SimpleDocTemplate, Paragraph, Spacer, HRFlowable, Table, TableStyle
 from reportlab.pdfbase import pdfmetrics
 from reportlab.pdfbase.ttfonts import TTFont
 from .config import CHINESE_FONT
@@ -21,27 +21,31 @@ def _convert_md_table_to_data(lines):
     return data
 
 def generate_pdf_report(filename, title, date, ffb, cpo, content, table_data=None):
-    """產出專業 PDF (修正標題誤食表格與分頁問題)"""
+    """產出專業 PDF (穩定版：確保內容不遺失)"""
     try:
         doc = SimpleDocTemplate(filename, pagesize=A4, rightMargin=45, leftMargin=45, topMargin=40, bottomMargin=40)
         
         # 定義樣式
-        title_style = ParagraphStyle('T', fontName='Chinese', fontSize=22, leading=30, alignment=1, spaceAfter=25, textColor=colors.HexColor("#1A5276"))
+        title_style = ParagraphStyle('T', fontName='Chinese', fontSize=22, leading=30, alignment=1, spaceAfter=20, textColor=colors.HexColor("#1A5276"))
         header_style = ParagraphStyle('H', fontName='Chinese', fontSize=11, leading=16, alignment=0, spaceAfter=5, textColor=colors.darkgrey)
         h1_style = ParagraphStyle('H1', fontName='Chinese', fontSize=15, leading=22, spaceBefore=12, spaceAfter=8, textColor=colors.HexColor("#2E86C1"))
-        h2_style = ParagraphStyle('H2', fontName='Chinese', fontSize=12, leading=18, spaceBefore=10, spaceAfter=4, textColor=colors.black)
+        h2_style = ParagraphStyle('H2', fontName='Chinese', fontSize=12, leading=18, spaceBefore=8, spaceAfter=4, textColor=colors.black)
         body_style = ParagraphStyle('B', fontName='Chinese', fontSize=11, leading=17, spaceAfter=6)
         
         story = [Paragraph(f"<b>{title}</b>", title_style)]
-        story.append(Paragraph(f"報告日期: {date} | FFB: {ffb} | CPO: {cpo}" if ffb != "N/A" else f"報告日期: {date}", header_style))
+        
+        # 標頭資訊
+        header_txt = f"報告日期: {date}" if ffb == "N/A" else f"報告日期: {date} | FFB: {ffb} | CPO: {cpo}"
+        story.append(Paragraph(header_txt, header_style))
         story.append(HRFlowable(width="100%", thickness=0.5, color=colors.lightgrey, spaceAfter=15))
 
+        # 內容處理
         lines = [l.strip() for l in content.split('\n') if l.strip()]
         i = 0
         while i < len(lines):
             line = lines[i]
             
-            # 1. 表格優先偵測 (放在最前面，防止被標題邏輯誤抓)
+            # 1. 偵測表格
             if line.startswith('|') and i + 1 < len(lines) and '---' in lines[i+1]:
                 table_lines = []
                 while i < len(lines) and '|' in lines[i]:
@@ -58,48 +62,33 @@ def generate_pdf_report(filename, title, date, ffb, cpo, content, table_data=Non
                         ('ALIGN', (0,0), (-1,-1), 'LEFT'),
                         ('FONTSIZE', (0,0), (-1,-1), 10),
                     ]))
-                    story.append(t); story.append(Spacer(1, 15))
+                    story.append(t); story.append(Spacer(1, 12))
                 continue
 
-            # 2. 處理大標題 (檢查下一行是否為表格，如果是則不綁定)
+            # 2. 處理大標題
             if line.startswith('##') or line.startswith('一、') or line.startswith('二、') or line.startswith('三、') or line.startswith('四、'):
                 clean_line = line.replace('#', '').strip()
-                header_p = Paragraph(f"<b>{clean_line}</b>", h1_style)
-                
-                # 如果下一行不是表格，才進行綁定
-                if i + 1 < len(lines) and not lines[i+1].startswith('|'):
-                    next_line = lines[i+1].replace('-', '· ').replace('・', '· ')
-                    next_p = Paragraph(next_line, body_style)
-                    story.append(KeepTogether([header_p, next_p]))
-                    i += 2
-                else:
-                    story.append(header_p)
-                    i += 1
-                continue
+                story.append(Paragraph(f"<b>{clean_line}</b>", h1_style))
             
             # 3. 處理中標題
-            elif line.startswith('1.') or line.startswith('2.') or line.startswith('3.') or line.endswith('：'):
-                header_p = Paragraph(f"<b>{line}</b>", h2_style)
-                if i + 1 < len(lines) and not lines[i+1].startswith('|'):
-                    next_line = lines[i+1].replace('-', '· ').replace('・', '· ')
-                    next_p = Paragraph(next_line, body_style)
-                    story.append(KeepTogether([header_p, next_p]))
-                    i += 2
-                else:
-                    story.append(header_p)
-                    i += 1
-                continue
-
-            # 4. 處理內文
-            else:
-                if line.startswith('|'): # 處理可能的零散表格行
-                    story.append(Paragraph(line, body_style))
-                else:
-                    clean_text = line.replace('-', '· ').replace('・', '· ').replace('•', '· ').replace('·', '· ')
-                    clean_text = clean_text.replace('#','').replace('*','').replace('`','')
-                    story.append(Paragraph(clean_text, body_style))
-                i += 1
+            elif line.startswith('1.') or line.startswith('2.') or line.startswith('3.') or (line.endswith('：') and len(line) < 30):
+                story.append(Paragraph(f"<b>{line}</b>", h2_style))
             
+            # 4. 處理一般內容 (直接輸出每一行)
+            else:
+                clean_text = line.replace('-', '· ').replace('・', '· ').replace('•', '· ').replace('·', '· ')
+                clean_text = clean_text.replace('#','').replace('*','').replace('`','')
+                story.append(Paragraph(clean_text, body_style))
+            
+            i += 1
+            
+        # 最後的靜態數據表 (如攝影機)
+        if table_data:
+            story.append(Spacer(1, 15))
+            t = Table(table_data, colWidths=[100, 60, 310])
+            t.setStyle(TableStyle([('FONTNAME', (0,0), (-1,-1), 'Chinese'), ('GRID', (0,0), (-1,-1), 0.5, colors.grey)]))
+            story.append(t)
+
         doc.build(story)
         return True
     except Exception as e:
