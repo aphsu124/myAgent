@@ -92,18 +92,11 @@ def main():
     
     final_content = summary_md + "\n\n" + content
     
-    # [ Council 最終暴力修復：落款徹底封殺 ]
-    # 直接在最終字串中搜索並切除包含敏感詞的最後一段
-    blacklist = ["分析師", "分析團隊", "2026年", "您的姓名", "團隊"]
-    for word in blacklist:
-        if word in final_content:
-            # 尋找該詞最後出現的位置，並嘗試切除最後一個段落
-            idx = final_content.rfind(word)
-            if idx > len(summary_md): # 確保不切到標題
-                # 往回找最近的一個空行或雙星號標題
-                cut_point = final_content.rfind("\n\n", 0, idx)
-                if cut_point != -1 and cut_point > len(summary_md):
-                    final_content = final_content[:cut_point]
+    # [ Council 終極暴力修復：不留死角 ]
+    # 直接透過 Regex 移除任何包含分析師或日期的行 (不論是否在結尾)
+    final_content = re.sub(r'\n.*?(分析師|分析團隊|2026年|您的姓名|簽名).*?\n?', '\n', final_content)
+    # 針對 Markdown 加粗版的特別清理
+    final_content = re.sub(r'\*\*.*?(分析師|日期|團隊).*?\*\*', '', final_content)
     
     # 再次確保乾淨
     final_content = final_content.strip()
