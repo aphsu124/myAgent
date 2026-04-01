@@ -92,14 +92,17 @@ def main():
     
     final_content = summary_md + "\n\n" + content
     
-    # [ Council 終極暴力修復：不留死角 ]
-    # 直接透過 Regex 移除任何包含分析師或日期的行 (不論是否在結尾)
-    final_content = re.sub(r'\n.*?(分析師|分析團隊|2026年|您的姓名|簽名).*?\n?', '\n', final_content)
-    # 針對 Markdown 加粗版的特別清理
-    final_content = re.sub(r'\*\*.*?(分析師|日期|團隊).*?\*\*', '', final_content)
+    # [ Council 終極物理毀滅：不計代價清理 ]
+    # 建立一個極端黑名單，包含所有可能的落款組合
+    nuclear_blacklist = [
+        "**棕櫚油資深分析師**", "棕櫚油資深分析師", "資深分析師",
+        "2026年4月1日", "2026年04月01日", "分析團隊", "您的姓名", "團隊"
+    ]
+    for target in nuclear_blacklist:
+        final_content = final_content.replace(target, "")
     
-    # 再次確保乾淨
-    final_content = final_content.strip()
+    # 清理殘留的孤立星號與空格
+    final_content = final_content.replace("****", "").replace("** **", "").strip()
     
     pdf_path = os.path.join(config.ICLOUD_BASE, f"{date_fn}_{suffix}.pdf")
     pdf_handler.generate_pdf_report(pdf_path, title, date_ds, data.get('ffb'), data.get('cpo'), final_content)
