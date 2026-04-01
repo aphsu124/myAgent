@@ -49,10 +49,11 @@ def main():
     請撰寫繁體中文「{'晨報' if mode=='news_only' else '日報'}」。
     內容要求：
     1. 針對 FFB、CPO 趨勢做詳細分析。
-    2. 針對 BMD 期貨與匯率對基差的影響進行解讀。
+    2. 解讀 BMD 期貨與匯率對基差的影響進行解讀。
     3. 分析原因時，請列出至少 4 個關鍵點，並確保編號為 1. 2. 3. 4.。
-    4. 嚴禁正文出現 JSON、DATA 或代碼塊字眼。
-    5. 必須在【第一行】輸出數據：DATA_JSON: {{\"ffb\": 8.1, \"cpo\": 45.5, \"bmd_myr\": 4828, \"ex_rate\": 7.78}}
+    4. 嚴禁在文中提到 JSON、DATA 或代碼塊字眼。
+    5. 嚴禁在結尾添加任何簽名、分析師姓名、日期或落款（例如：資深分析師、分析團隊、2026年...）。
+    6. 必須在【第一行】輸出數據：DATA_JSON: {{\"ffb\": 8.1, \"cpo\": 45.5, \"bmd_myr\": 4828, \"ex_rate\": 7.78}}
     數據參考：{raw_data}"""
     
     content, data = "無法生成報告。", {"ffb": 8.1, "cpo": 45.5, "bmd_myr": 4828, "ex_rate": 7.78}
@@ -64,13 +65,16 @@ def main():
             if m: data = json.loads(m.group(1))
             
             clean_content = re.sub(r'^.*?DATA_JSON:.*?\n', '', raw_text, flags=re.MULTILINE)
-            # 段落平滑化：合併非標題、非清單的硬換行
+            # 段落平滑化與落款清理
             lines = clean_content.split('\n')
             processed_lines = []
             for line in lines:
                 line = line.strip()
                 if not line: processed_lines.append("")
-                elif line.startswith(('#', '|', '-', '1.', '2.', '3.', '4.', '・')): processed_lines.append(line)
+                # 過濾簽名/落款行
+                if re.search(r'(資深分析師|分析團隊|2026年\d+月\d+日|您的姓名|簽名)', line): continue
+                
+                if line.startswith(('#', '|', '-', '1.', '2.', '3.', '4.', '・')): processed_lines.append(line)
                 else:
                     if processed_lines and processed_lines[-1] != "" and not processed_lines[-1].startswith(('#', '|', '-', '1.', '2.', '3.', '4.', '・')):
                         processed_lines[-1] += line
