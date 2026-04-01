@@ -598,3 +598,13 @@ Traceback (most recent call last):
   File "/Users/bucksteam/myAgent/scripts/contact_manager.py", line 99, in main
     files = [os.path.join(BASE_DIR, f) for f in os.listdir(BASE_DIR) if os.path.isfile(os.path.join(BASE_DIR, f)) and not f.startswith(".")]
 PermissionError: [Errno 1] Operation not permitted: '/Users/bucksteam/Library/Mobile Documents/com~apple~CloudDocs/泰國/工作/聯絡人'
+/Users/bucksteam/Library/Python/3.9/lib/python/site-packages/google/auth/__init__.py:54: FutureWarning: You are using a Python version 3.9 past its end of life. Google will update google-auth with critical bug fixes on a best-effort basis, but not with any other fixes or features. Please upgrade your Python version, and then update google-auth.
+  warnings.warn(eol_message.format("3.9"), FutureWarning)
+/Users/bucksteam/Library/Python/3.9/lib/python/site-packages/google/oauth2/__init__.py:40: FutureWarning: You are using a Python version 3.9 past its end of life. Google will update google-auth with critical bug fixes on a best-effort basis, but not with any other fixes or features. Please upgrade your Python version, and then update google-auth.
+  warnings.warn(eol_message.format("3.9"), FutureWarning)
+Traceback (most recent call last):
+  File "/Users/bucksteam/myAgent/scripts/contact_manager.py", line 103, in <module>
+    main()
+  File "/Users/bucksteam/myAgent/scripts/contact_manager.py", line 99, in main
+    files = [os.path.join(BASE_DIR, f) for f in os.listdir(BASE_DIR) if os.path.isfile(os.path.join(BASE_DIR, f)) and not f.startswith(".")]
+PermissionError: [Errno 1] Operation not permitted: '/Users/bucksteam/Library/Mobile Documents/com~apple~CloudDocs/泰國/工作/聯絡人'
