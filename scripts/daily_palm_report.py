@@ -80,15 +80,15 @@ def main():
 ## 📌 {report_type_label}核心數據快報 ({date_ds})
 | 指標項目 | 數值 | 單位 |
 | :--- | :--- | :--- |
-| **FFB 鮮果收購價** | **{data.get('ffb')}** | THB/kg |
-| **CPO 毛油現貨價** | **{data.get('cpo')}** | THB/kg |
-| **BMD 期貨折算價** | **{bmd_thb}** | THB/kg |
-| **當日基差 (Basis)** | **{basis}** | THB/kg |
+| FFB 鮮果收購價 | {data.get('ffb')} | THB/kg |
+| CPO 毛油現貨價 | {data.get('cpo')} | THB/kg |
+| BMD 期貨折算價 | {bmd_thb} | THB/kg |
+| 當日基差 (Basis) | {basis} | THB/kg |
 
 ---
 """
-    # 強力清理所有殘留符號與 JSON
-    clean_content = re.sub(r'DATA_JSON: {.*?}', '', content)
+    # 強力清理所有殘留符號、JSON 代碼塊與技術文字 (使用多行匹配)
+    clean_content = re.sub(r'DATA_JSON:.*?({.*?}|```json.*?```)', '', content, flags=re.DOTALL)
     clean_content = clean_content.replace('· · ·', '').replace('···', '').strip()
     final_content = summary_md + clean_content
     
@@ -96,8 +96,8 @@ def main():
     pdf_path = os.path.join(config.ICLOUD_BASE, f"{date_fn}_{suffix}.pdf")
     pdf_handler.generate_pdf_report(pdf_path, title, date_ds, data.get('ffb'), data.get('cpo'), final_content)
 
-    # D. 更新網頁
-    html_body = markdown.markdown(final_content)
+    # D. 更新網頁 (啟用表格擴展)
+    html_body = markdown.markdown(final_content, extensions=['tables'])
     web_content = f"<html><body style='background:#121212;color:#e0e0e0;padding:40px;font-family:sans-serif;'><h1>{title}</h1>{html_body}</body></html>"
     with open(html_path, "w", encoding="utf-8") as f: f.write(web_content)
     with open(os.path.join(config.BASE_DIR, "docs/index.html"), "w", encoding="utf-8") as f: f.write(web_content)
