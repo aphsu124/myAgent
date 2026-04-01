@@ -71,8 +71,8 @@ def main():
             for line in lines:
                 line = line.strip()
                 if not line: processed_lines.append("")
-                # 過濾簽名/落款行
-                if re.search(r'(資深分析師|分析團隊|2026年\d+月\d+日|您的姓名|簽名)', line): continue
+                # 更激進的過濾：攔截所有包含落款特徵的行
+                if re.search(r'(分析師|分析团队|2026年|您的姓名|簽名|團隊|落款)', line): continue
                 
                 if line.startswith(('#', '|', '-', '1.', '2.', '3.', '4.', '・')): processed_lines.append(line)
                 else:
@@ -80,6 +80,8 @@ def main():
                         processed_lines[-1] += line
                     else: processed_lines.append(line)
             content = "\n".join(processed_lines).strip()
+            # 結尾二次清理：確保最後一行不是加粗的分析師字樣
+            content = re.sub(r'\n\*\*.*?(分析師|日期).*?\*\*.*$', '', content, flags=re.DOTALL)
     except: pass
 
     bmd_thb, basis = excel_handler.update_data(date_ds, data.get('ffb'), data.get('cpo'), data.get('bmd_myr'), data.get('ex_rate'))
