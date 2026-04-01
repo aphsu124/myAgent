@@ -7,12 +7,12 @@ from reportlab.pdfbase import pdfmetrics
 from reportlab.pdfbase.ttfonts import TTFont
 from .config import CHINESE_FONT
 
-# 優先使用 Medium 版本以支援粗體
+# 註冊字體
 MEDIUM_FONT = '/System/Library/Fonts/STHeiti Medium.ttc'
 pdfmetrics.registerFont(TTFont('Chinese', MEDIUM_FONT))
 
 def _convert_md_table_to_data(lines):
-    """將 Markdown 格式的表格行轉換為 Table 數據列表"""
+    """轉換 Markdown 表格行到數據列表"""
     data = []
     for line in lines:
         if '|' in line and '---' not in line:
@@ -21,11 +21,11 @@ def _convert_md_table_to_data(lines):
     return data
 
 def generate_pdf_report(filename, title, date, ffb, cpo, content, table_data=None):
-    """產出專業 PDF (穩定版：確保內容不遺失)"""
+    """產出 PDF (Council 修復版：解決跳行與內容遺失)"""
     try:
         doc = SimpleDocTemplate(filename, pagesize=A4, rightMargin=45, leftMargin=45, topMargin=40, bottomMargin=40)
         
-        # 定義樣式
+        # 樣式定義
         title_style = ParagraphStyle('T', fontName='Chinese', fontSize=22, leading=30, alignment=1, spaceAfter=20, textColor=colors.HexColor("#1A5276"))
         header_style = ParagraphStyle('H', fontName='Chinese', fontSize=11, leading=16, alignment=0, spaceAfter=5, textColor=colors.darkgrey)
         h1_style = ParagraphStyle('H1', fontName='Chinese', fontSize=15, leading=22, spaceBefore=12, spaceAfter=8, textColor=colors.HexColor("#2E86C1"))
@@ -33,24 +33,28 @@ def generate_pdf_report(filename, title, date, ffb, cpo, content, table_data=Non
         body_style = ParagraphStyle('B', fontName='Chinese', fontSize=11, leading=17, spaceAfter=6)
         
         story = [Paragraph(f"<b>{title}</b>", title_style)]
-        
-        # 標頭資訊
-        header_txt = f"報告日期: {date}" if ffb == "N/A" else f"報告日期: {date} | FFB: {ffb} | CPO: {cpo}"
-        story.append(Paragraph(header_txt, header_style))
+        story.append(Paragraph(f"報告日期: {date} | FFB: {ffb} | CPO: {cpo}" if ffb != "N/A" else f"報告日期: {date}", header_style))
         story.append(HRFlowable(width="100%", thickness=0.5, color=colors.lightgrey, spaceAfter=15))
 
-        # 內容處理
-        lines = [l.strip() for l in content.split('\n') if l.strip()]
+        # 核心遍歷邏輯 ( काउंसिल修復：解決指針遞增問題 )
+        lines = content.split('\n')
         i = 0
         while i < len(lines):
-            line = lines[i]
+            line = lines[i].strip()
+            if not line:
+                story.append(Spacer(1, 6))
+                i += 1
+                continue
             
             # 1. 偵測表格
             if line.startswith('|') and i + 1 < len(lines) and '---' in lines[i+1]:
                 table_lines = []
+                # 收集直到非表格行
                 while i < len(lines) and '|' in lines[i]:
-                    if '---' not in lines[i]: table_lines.append(lines[i])
+                    if '---' not in lines[i]:
+                        table_lines.append(lines[i])
                     i += 1
+                
                 t_data = _convert_md_table_to_data(table_lines)
                 if t_data:
                     t = Table(t_data, colWidths=[150, 100, 100])
@@ -58,15 +62,16 @@ def generate_pdf_report(filename, title, date, ffb, cpo, content, table_data=Non
                         ('FONTNAME', (0,0), (-1,-1), 'Chinese'),
                         ('BACKGROUND', (0,0), (-1,0), colors.HexColor("#F2F4F4")),
                         ('GRID', (0,0), (-1,-1), 0.5, colors.lightgrey),
-                        ('VALIGN', (0,0), (-1,-1), 'MIDDLE'),
                         ('ALIGN', (0,0), (-1,-1), 'LEFT'),
                         ('FONTSIZE', (0,0), (-1,-1), 10),
                     ]))
-                    story.append(t); story.append(Spacer(1, 12))
+                    story.append(t)
+                    story.append(Spacer(1, 12))
+                # 注意：此處不需額外 i += 1，因為 while 內已經推進了 i
                 continue
 
             # 2. 處理大標題
-            if line.startswith('##') or line.startswith('一、') or line.startswith('二、') or line.startswith('三、') or line.startswith('四、'):
+            if line.startswith('##') or line.startswith('一、') or line.startswith('二、') or line.startswith('三、'):
                 clean_line = line.replace('#', '').strip()
                 story.append(Paragraph(f"<b>{clean_line}</b>", h1_style))
             
@@ -74,7 +79,7 @@ def generate_pdf_report(filename, title, date, ffb, cpo, content, table_data=Non
             elif line.startswith('1.') or line.startswith('2.') or line.startswith('3.') or (line.endswith('：') and len(line) < 30):
                 story.append(Paragraph(f"<b>{line}</b>", h2_style))
             
-            # 4. 處理一般內容 (直接輸出每一行)
+            # 4. 處理內文
             else:
                 clean_text = line.replace('-', '· ').replace('・', '· ').replace('•', '· ').replace('·', '· ')
                 clean_text = clean_text.replace('#','').replace('*','').replace('`','')
@@ -82,13 +87,6 @@ def generate_pdf_report(filename, title, date, ffb, cpo, content, table_data=Non
             
             i += 1
             
-        # 最後的靜態數據表 (如攝影機)
-        if table_data:
-            story.append(Spacer(1, 15))
-            t = Table(table_data, colWidths=[100, 60, 310])
-            t.setStyle(TableStyle([('FONTNAME', (0,0), (-1,-1), 'Chinese'), ('GRID', (0,0), (-1,-1), 0.5, colors.grey)]))
-            story.append(t)
-
         doc.build(story)
         return True
     except Exception as e:

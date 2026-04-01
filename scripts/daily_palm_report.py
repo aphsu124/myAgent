@@ -92,30 +92,26 @@ def main():
 | 當日基差 (Basis) | {basis} | THB/kg |
 
 """
-    # 強力清理技術文字與角色殘留 (改為非貪婪且不跨行的精準匹配)
-    # 1. 先拔除結尾的 JSON 區塊
-    clean_content = re.sub(r'```json.*?```', '', content, flags=re.DOTALL)
+    # 強力清理技術文字與角色殘留
+    clean_content = content
+    # 1. 拔除 JSON 區塊與代碼標籤 (DOTALL 用於跨行抓取 JSON)
+    clean_content = re.sub(r'```json.*?```', '', clean_content, flags=re.DOTALL)
     clean_content = re.sub(r'\{[^{}]*?"ffb"[^{}]*?\}', '', clean_content, flags=re.DOTALL)
     
-    # 2. 拔除特定的技術標籤 (不使用 DOTALL，防止誤傷正文)
-    tech_labels = [
+    # 2. 拔除角色與技術標籤 (不跨行)
+    tech_patterns = [
         r'(?:DATA_JSON|數據輸出\s*JSON|JSON\s*數據|json)[:：]?\s*',
         r'資深分析師[:：]?\s*',
-        r'我是.*?分析師.*?\n?'
+        r'我是.*?分析師.*'
     ]
-    for pattern in tech_labels:
+    for pattern in tech_patterns:
         clean_content = re.sub(pattern, '', clean_content, flags=re.IGNORECASE)
     
-    # 3. 物理刪除分隔線與冗餘符號
+    # 3. 移除分隔線與清理結尾
     clean_content = re.sub(r'^\s*([-*_=]){3,}\s*$', '', clean_content, flags=re.MULTILINE)
-    
-    # 4. 段落平滑化：僅合併純文字行的硬換行 (避開 Markdown 語法行)
-    # 只有當行尾不是標點符號，且下一行是純文字時才合併
-    clean_content = re.sub(r'([^\s!?,.:;！？，。：；])\n([^\s#\d\-\|一二三四])', r'\1\2', clean_content)
-    
-    # 移除結尾所有殘留標點與空格
     clean_content = re.sub(r'(·|\.|\s|json|{|}|\s|數據輸出|JSON|:|資深分析師)*$', '', clean_content, flags=re.IGNORECASE)
-    final_content = summary_md + clean_content.strip()
+    
+    final_content = summary_md + "\n" + clean_content.strip()
     
     # C. 產出 PDF
     pdf_path = os.path.join(config.ICLOUD_BASE, f"{date_fn}_{suffix}.pdf")
