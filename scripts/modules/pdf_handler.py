@@ -1,4 +1,5 @@
 import os
+import html
 from reportlab.lib import colors
 from reportlab.lib.pagesizes import A4
 from reportlab.lib.styles import getSampleStyleSheet, ParagraphStyle
@@ -11,50 +12,49 @@ from .config import CHINESE_FONT
 MEDIUM_FONT = '/System/Library/Fonts/STHeiti Medium.ttc'
 pdfmetrics.registerFont(TTFont('Chinese', MEDIUM_FONT))
 
-def _convert_md_table_to_data(lines):
-    """轉換 Markdown 表格行到數據列表"""
+def _convert_md_table_to_data(table_lines):
+    """安全轉換 Markdown 表格"""
     data = []
-    for line in lines:
+    for line in table_lines:
         if '|' in line and '---' not in line:
             cells = [c.strip().replace('**', '') for c in line.split('|') if c.strip()]
             if cells: data.append(cells)
     return data
 
 def generate_pdf_report(filename, title, date, ffb, cpo, content, table_data=None):
-    """產出 PDF (Council 修復版：解決跳行與內容遺失)"""
+    """產出 PDF (最終重構版：絕不遺失內容)"""
     try:
         doc = SimpleDocTemplate(filename, pagesize=A4, rightMargin=45, leftMargin=45, topMargin=40, bottomMargin=40)
         
-        # 樣式定義
-        title_style = ParagraphStyle('T', fontName='Chinese', fontSize=22, leading=30, alignment=1, spaceAfter=20, textColor=colors.HexColor("#1A5276"))
-        header_style = ParagraphStyle('H', fontName='Chinese', fontSize=11, leading=16, alignment=0, spaceAfter=5, textColor=colors.darkgrey)
+        # 樣式設定
+        t_s = ParagraphStyle('T', fontName='Chinese', fontSize=22, leading=30, alignment=1, spaceAfter=20, textColor=colors.HexColor("#1A5276"))
+        h_s = ParagraphStyle('H', fontName='Chinese', fontSize=11, leading=16, alignment=0, spaceAfter=5, textColor=colors.darkgrey)
         h1_style = ParagraphStyle('H1', fontName='Chinese', fontSize=15, leading=22, spaceBefore=12, spaceAfter=8, textColor=colors.HexColor("#2E86C1"))
         h2_style = ParagraphStyle('H2', fontName='Chinese', fontSize=12, leading=18, spaceBefore=8, spaceAfter=4, textColor=colors.black)
         body_style = ParagraphStyle('B', fontName='Chinese', fontSize=11, leading=17, spaceAfter=6)
         
-        story = [Paragraph(f"<b>{title}</b>", title_style)]
-        story.append(Paragraph(f"報告日期: {date} | FFB: {ffb} | CPO: {cpo}" if ffb != "N/A" else f"報告日期: {date}", header_style))
+        story = [Paragraph(f"<b>{html.escape(title)}</b>", t_s)]
+        header_txt = f"報告日期: {date} | FFB: {ffb} | CPO: {cpo}" if ffb != "N/A" else f"報告日期: {date}"
+        story.append(Paragraph(html.escape(header_txt), h_s))
         story.append(HRFlowable(width="100%", thickness=0.5, color=colors.lightgrey, spaceAfter=15))
 
-        # 核心遍歷邏輯 ( काउंसिल修復：解決指針遞增問題 )
         lines = content.split('\n')
         i = 0
         while i < len(lines):
             line = lines[i].strip()
+            
+            # 1. 處理空行
             if not line:
-                story.append(Spacer(1, 6))
+                story.append(Spacer(1, 8))
                 i += 1
                 continue
             
-            # 1. 偵測表格
+            # 2. 偵測表格 (不推進 i，確保內部 while 處理完後主迴圈正確銜接)
             if line.startswith('|') and i + 1 < len(lines) and '---' in lines[i+1]:
                 table_lines = []
-                # 收集直到非表格行
                 while i < len(lines) and '|' in lines[i]:
-                    if '---' not in lines[i]:
-                        table_lines.append(lines[i])
+                    table_lines.append(lines[i])
                     i += 1
-                
                 t_data = _convert_md_table_to_data(table_lines)
                 if t_data:
                     t = Table(t_data, colWidths=[150, 100, 100])
@@ -65,29 +65,30 @@ def generate_pdf_report(filename, title, date, ffb, cpo, content, table_data=Non
                         ('ALIGN', (0,0), (-1,-1), 'LEFT'),
                         ('FONTSIZE', (0,0), (-1,-1), 10),
                     ]))
-                    story.append(t)
-                    story.append(Spacer(1, 12))
-                # 注意：此處不需額外 i += 1，因為 while 內已經推進了 i
-                continue
+                    story.append(t); story.append(Spacer(1, 12))
+                continue # Table 處理完後已推進 i，直接下一次迴圈
 
-            # 2. 處理大標題
+            # 3. 處理大標題 (轉義文字以防崩潰)
             if line.startswith('##') or line.startswith('一、') or line.startswith('二、') or line.startswith('三、'):
-                clean_line = line.replace('#', '').strip()
-                story.append(Paragraph(f"<b>{clean_line}</b>", h1_style))
+                txt = html.escape(line.replace('#', '').strip())
+                story.append(Paragraph(f"<b>{txt}</b>", h1_style))
             
-            # 3. 處理中標題
+            # 4. 處理中標題
             elif line.startswith('1.') or line.startswith('2.') or line.startswith('3.') or (line.endswith('：') and len(line) < 30):
-                story.append(Paragraph(f"<b>{line}</b>", h2_style))
+                txt = html.escape(line)
+                story.append(Paragraph(f"<b>{txt}</b>", h2_style))
             
-            # 4. 處理內文
+            # 5. 處理一般內容 (替換符號並轉義)
             else:
-                clean_text = line.replace('-', '· ').replace('・', '· ').replace('•', '· ').replace('·', '· ')
-                clean_text = clean_text.replace('#','').replace('*','').replace('`','')
-                story.append(Paragraph(clean_text, body_style))
+                clean_txt = line.replace('-', '· ').replace('・', '· ').replace('•', '· ')
+                # 再次清理 Markdown 殘留
+                clean_txt = clean_txt.replace('*', '').replace('`', '')
+                story.append(Paragraph(html.escape(clean_txt), body_style))
             
             i += 1
             
         doc.build(story)
         return True
     except Exception as e:
-        print(f"PDF 產出失敗: {e}"); return False
+        print(f"PDF 產出失敗: {e}")
+        return False

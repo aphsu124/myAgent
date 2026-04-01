@@ -92,13 +92,13 @@ def main():
 | 當日基差 (Basis) | {basis} | THB/kg |
 
 """
-    # 強力清理技術文字與角色殘留
+    # [ Council 修復：內容傳遞保護 ]
     clean_content = content
-    # 1. 拔除 JSON 區塊與代碼標籤 (DOTALL 用於跨行抓取 JSON)
+    # 僅拔除明確的 JSON 標註與技術字眼，避免誤傷正文
     clean_content = re.sub(r'```json.*?```', '', clean_content, flags=re.DOTALL)
     clean_content = re.sub(r'\{[^{}]*?"ffb"[^{}]*?\}', '', clean_content, flags=re.DOTALL)
     
-    # 2. 拔除角色與技術標籤 (不跨行)
+    # 攔截特定的角色扮演文字與標籤
     tech_patterns = [
         r'(?:DATA_JSON|數據輸出\s*JSON|JSON\s*數據|json)[:：]?\s*',
         r'資深分析師[:：]?\s*',
@@ -107,11 +107,15 @@ def main():
     for pattern in tech_patterns:
         clean_content = re.sub(pattern, '', clean_content, flags=re.IGNORECASE)
     
-    # 3. 移除分隔線與清理結尾
+    # 物理刪除分隔線並清理結尾
     clean_content = re.sub(r'^\s*([-*_=]){3,}\s*$', '', clean_content, flags=re.MULTILINE)
     clean_content = re.sub(r'(·|\.|\s|json|{|}|\s|數據輸出|JSON|:|資深分析師)*$', '', clean_content, flags=re.IGNORECASE)
     
     final_content = summary_md + "\n" + clean_content.strip()
+    
+    # [ 偵錯輸出 ] 將傳給 PDF 的字串寫入文件，確保 100% 原始
+    with open(os.path.join(config.BASE_DIR, "data/DEBUG_CONTENT.txt"), "w", encoding="utf-8") as f:
+        f.write(final_content)
     
     # C. 產出 PDF
     pdf_path = os.path.join(config.ICLOUD_BASE, f"{date_fn}_{suffix}.pdf")
