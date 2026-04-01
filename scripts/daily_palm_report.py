@@ -92,17 +92,14 @@ def main():
     
     final_content = summary_md + "\n\n" + content
     
-    # [ Council 終極物理毀滅：不計代價清理 ]
-    # 建立一個極端黑名單，包含所有可能的落款組合
-    nuclear_blacklist = [
-        "**棕櫚油資深分析師**", "棕櫚油資深分析師", "資深分析師",
-        "2026年4月1日", "2026年04月01日", "分析團隊", "您的姓名", "團隊"
-    ]
-    for target in nuclear_blacklist:
-        final_content = final_content.replace(target, "")
+    # [ Council 最終極解決方案：句號後物理截斷 ]
+    # 尋找最後一個中文句號，將其後的所有內容 (落款) 徹底蒸發
+    last_period = final_content.rfind("。")
+    if last_period != -1 and last_period > len(summary_md):
+        final_content = final_content[:last_period+1]
     
-    # 清理殘留的孤立星號與空格
-    final_content = final_content.replace("****", "").replace("** **", "").strip()
+    # 再次清理可能殘留的 Markdown 符號
+    final_content = final_content.strip()
     
     pdf_path = os.path.join(config.ICLOUD_BASE, f"{date_fn}_{suffix}.pdf")
     pdf_handler.generate_pdf_report(pdf_path, title, date_ds, data.get('ffb'), data.get('cpo'), final_content)
