@@ -62,19 +62,38 @@ def main():
         if resp.text:
             content = resp.text
             m = re.search(r'DATA_JSON: ({.*?})', content)
-            if m: data = json.loads(m.group(1))
+            if m: 
+                data = json.loads(m.group(1))
+                # 關鍵修正：從呈現內容中完全移除 DATA_JSON 與其後的任何標記
+                content = re.sub(r'DATA_JSON: {.*?}', '', content)
+                content = content.replace('· · ·', '').strip()
     except: pass
 
     # 4. 調用專家模組執行任務
-    # A. 更新 Excel (不論早晚都執行，確保指南區始終正確)
+    # A. 更新 Excel 與基差
     bmd_thb, basis = excel_handler.update_data(date_ds, data.get('ffb'), data.get('cpo'), data.get('bmd_myr'), data.get('ex_rate'))
+    excel_handler.generate_trend_chart() # 強制更新趨勢圖
     
-    # B. 產出 PDF
-    pdf_path = os.path.join(config.ICLOUD_BASE, f"{date_fn}_{suffix}.pdf")
-    pdf_handler.generate_pdf_report(pdf_path, title, date_ds, data.get('ffb'), data.get('cpo'), content)
+    # B. 格式化內容 (加入直覺的數據快報)
+    summary_md = f"""
+## 📌 今日核心數據快報 ({date_ds})
+| 指標項目 | 數值 | 單位 |
+| :--- | :--- | :--- |
+| **FFB 鮮果收購價** | **{data.get('ffb')}** | THB/kg |
+| **CPO 毛油現貨價** | **{data.get('cpo')}** | THB/kg |
+| **BMD 期貨折算價** | **{bmd_thb}** | THB/kg |
+| **今日基差 (Basis)** | **{basis}** | THB/kg |
 
-    # C. 更新網頁
-    html_body = markdown.markdown(content)
+---
+"""
+    final_content = summary_md + content
+    
+    # C. 產出 PDF
+    pdf_path = os.path.join(config.ICLOUD_BASE, f"{date_fn}_{suffix}.pdf")
+    pdf_handler.generate_pdf_report(pdf_path, title, date_ds, data.get('ffb'), data.get('cpo'), final_content)
+
+    # D. 更新網頁
+    html_body = markdown.markdown(final_content)
     web_content = f"<html><body style='background:#121212;color:#e0e0e0;padding:40px;font-family:sans-serif;'><h1>{title}</h1>{html_body}</body></html>"
     with open(html_path, "w", encoding="utf-8") as f: f.write(web_content)
     with open(os.path.join(config.BASE_DIR, "docs/index.html"), "w", encoding="utf-8") as f: f.write(web_content)

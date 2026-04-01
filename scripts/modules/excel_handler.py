@@ -1,8 +1,37 @@
 import os
 import pandas as pd
+import matplotlib.pyplot as plt
 from openpyxl import load_workbook
 from openpyxl.styles import Font, Alignment, PatternFill, Border, Side
-from .config import ICLOUD_EXCEL, MS_JH_FONT
+from .config import ICLOUD_EXCEL, MS_JH_FONT, ICLOUD_CHART
+
+# 設置中文字體 (針對 Mac)
+plt.rcParams['font.sans-serif'] = ['Arial Unicode MS']
+plt.rcParams['axes.unicode_minus'] = False
+
+def generate_trend_chart():
+    """繪製最新棕櫚油趨勢圖"""
+    try:
+        if not os.path.exists(ICLOUD_EXCEL): return
+        df = pd.read_excel(ICLOUD_EXCEL)
+        if len(df) < 2: return # 數據太少不繪圖
+        
+        plt.figure(figsize=(10, 6))
+        plt.plot(df['Date'], df['FFB'], label='FFB 現貨', marker='o', color='green')
+        plt.plot(df['Date'], df['CPO'], label='CPO 現貨', marker='s', color='orange')
+        plt.plot(df['Date'], df['BMD_THB_kg'], label='BMD 期貨 (折算泰銖)', linestyle='--', color='blue')
+        
+        plt.title('2026 泰國棕櫚油價格趨勢圖', fontsize=16)
+        plt.xlabel('日期', fontsize=12); plt.ylabel('泰銖 (THB/kg)', fontsize=12)
+        plt.legend(); plt.grid(True, linestyle=':', alpha=0.6)
+        plt.xticks(rotation=45)
+        plt.tight_layout()
+        
+        plt.savefig(ICLOUD_CHART)
+        plt.close()
+        print(f"📈 趨勢圖已更新: {ICLOUD_CHART}")
+    except Exception as e:
+        print(f"❌ 繪圖失敗: {e}")
 
 def apply_excel_style():
     """固化 14 號大字版與產業指南樣式"""
