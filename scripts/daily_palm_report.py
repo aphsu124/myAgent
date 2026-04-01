@@ -58,15 +58,19 @@ def main():
     
     content, data = "無法生成報告。", {"ffb": 8.1, "cpo": 45.5, "bmd_myr": 4828, "ex_rate": 7.78}
     try:
-        resp = client.models.generate_content(model="gemini-2.5-flash", contents=prompt)
+        # 增加生成長度限制並優化
+        config_gen = {"max_output_tokens": 2048, "temperature": 0.7}
+        resp = client.models.generate_content(model="gemini-2.5-flash", contents=prompt, config=config_gen)
         if resp.text:
             content = resp.text
-            m = re.search(r'DATA_JSON: ({.*?})', content)
+            # 1. 段落平滑化：移除段落內部的硬換行 (只有當下一行不符合新段落特徵時才合併)
+            content = re.sub(r'(?<!\n)\n(?![#\d\-\|一二三四])', ' ', content)
+            
+            # 2. 數據提取 (相容多種格式)
+            m = re.search(r'(?:DATA_JSON|數據輸出\s*JSON|JSON\s*數據).*?({.*?})', content, flags=re.DOTALL | re.IGNORECASE)
             if m: 
-                data = json.loads(m.group(1))
-                # 關鍵修正：從呈現內容中完全移除 DATA_JSON 與其後的任何標記
-                content = re.sub(r'DATA_JSON: {.*?}', '', content)
-                content = content.replace('· · ·', '').strip()
+                try: data = json.loads(m.group(1))
+                except: pass
     except: pass
 
     # 4. 調用專家模組執行任務
@@ -88,11 +92,13 @@ def main():
 | 當日基差 (Basis) | {basis} | THB/kg |
 
 """
-    # 強力清理技術文字 (中英文變體)
+    # 強力清理技術文字與角色殘留 (中英文變體)
     tech_patterns = [
         r'(DATA_JSON|數據輸出\s*JSON|JSON\s*數據|json).*?({.*?}|```json.*?```)',
         r'數據輸出\s*JSON:?\s*',
-        r'DATA_JSON:?\s*'
+        r'DATA_JSON:?\s*',
+        r'資深分析師[:：]?\s*',
+        r'我是.*?分析師.*?\n?'
     ]
     clean_content = content
     for pattern in tech_patterns:
@@ -101,8 +107,8 @@ def main():
     # 物理刪除 Markdown 分隔線，從源頭根除 · · ·
     clean_content = re.sub(r'^\s*([-*_=]){3,}\s*$', '', clean_content, flags=re.MULTILINE)
     
-    # 移除結尾所有殘留 (點、大括號、JSON 標記、技術字)
-    clean_content = re.sub(r'(·|\.|\s|json|{|}|\s|數據輸出|JSON|:)*$', '', clean_content, flags=re.IGNORECASE)
+    # 移除結尾所有殘留 (點、大括號、JSON 標記、角色關鍵字)
+    clean_content = re.sub(r'(·|\.|\s|json|{|}|\s|數據輸出|JSON|:|資深分析師)*$', '', clean_content, flags=re.IGNORECASE)
     final_content = summary_md + clean_content.strip()
     
     # C. 產出 PDF
