@@ -9,6 +9,7 @@ load_dotenv()
 class AIFactory:
     def __init__(self):
         self.gemini_client = genai.Client(api_key=os.getenv("GEMINI_API_KEY"), http_options={'api_version': 'v1'})
+        # 修正為實測成功的 Claude 4 系列名稱
         self.claude_client = anthropic.Anthropic(api_key=os.getenv("ANTHROPIC_API_KEY"))
         self.openai_client = OpenAI(api_key=os.getenv("OPENAI_API_KEY"))
 
@@ -20,9 +21,8 @@ class AIFactory:
 
     def ask_claude(self, prompt):
         try:
-            # 修正模型名稱為最新版
             resp = self.claude_client.messages.create(
-                model="claude-3-5-sonnet-latest",
+                model="claude-sonnet-4-6", # 這裡使用實測成功的名稱
                 max_tokens=2048,
                 messages=[{"role": "user", "content": prompt}]
             )
