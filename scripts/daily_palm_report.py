@@ -92,28 +92,25 @@ def main():
 | 當日基差 (Basis) | {basis} | THB/kg |
 
 """
-    # [ Council 修復：內容傳遞保護 ]
+    # [ Council 修復：極簡安全清理 ]
+    # 1. 記錄原始回應
+    with open(os.path.join(config.BASE_DIR, "data/DEBUG_RAW.txt"), "w", encoding="utf-8") as f:
+        f.write(content)
+
+    # 2. 物理截斷：只保留技術標籤之前的文字
     clean_content = content
-    # 僅拔除明確的 JSON 標註與技術字眼，避免誤傷正文
-    clean_content = re.sub(r'```json.*?```', '', clean_content, flags=re.DOTALL)
-    clean_content = re.sub(r'\{[^{}]*?"ffb"[^{}]*?\}', '', clean_content, flags=re.DOTALL)
+    split_keys = ["DATA_JSON", "數據輸出 JSON", "JSON 數據", "```json"]
+    for key in split_keys:
+        if key in clean_content:
+            clean_content = clean_content.split(key)[0]
     
-    # 攔截特定的角色扮演文字與標籤
-    tech_patterns = [
-        r'(?:DATA_JSON|數據輸出\s*JSON|JSON\s*數據|json)[:：]?\s*',
-        r'資深分析師[:：]?\s*',
-        r'我是.*?分析師.*'
-    ]
-    for pattern in tech_patterns:
-        clean_content = re.sub(pattern, '', clean_content, flags=re.IGNORECASE)
-    
-    # 物理刪除分隔線並清理結尾
+    # 3. 基礎雜質過濾 (僅限單行，不跨行)
+    clean_content = re.sub(r'资深分析师[:：]?\s*', '', clean_content)
     clean_content = re.sub(r'^\s*([-*_=]){3,}\s*$', '', clean_content, flags=re.MULTILINE)
-    clean_content = re.sub(r'(·|\.|\s|json|{|}|\s|數據輸出|JSON|:|資深分析師)*$', '', clean_content, flags=re.IGNORECASE)
     
     final_content = summary_md + "\n" + clean_content.strip()
     
-    # [ 偵錯輸出 ] 將傳給 PDF 的字串寫入文件，確保 100% 原始
+    # [ 偵錯輸出 ]
     with open(os.path.join(config.BASE_DIR, "data/DEBUG_CONTENT.txt"), "w", encoding="utf-8") as f:
         f.write(final_content)
     
