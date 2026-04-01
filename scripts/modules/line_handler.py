@@ -3,18 +3,28 @@ import os
 from .config import LINE_CHANNEL_ACCESS_TOKEN, LINE_USER_ID, GITHUB_IO_URL
 
 def send_push_notification(title, date_str, ffb, cpo, basis):
-    """發送 LINE 推播訊息"""
+    """發送 LINE 推播訊息 (修復基差 0 與美化版)"""
     if not LINE_CHANNEL_ACCESS_TOKEN or not LINE_USER_ID: return
     
-    # 格式化數值
-    disp_f = f"{ffb} Baht/kg" if str(ffb) != "N/A" and ffb != 0 else "市場未開盤"
-    disp_c = f"{cpo} Baht/kg" if str(cpo) != "N/A" and cpo != 0 else "市場未開盤"
+    # 格式化數值與防呆
+    is_open = str(cpo) != "N/A" and float(cpo) > 0
+    disp_f = f"฿{ffb}" if str(ffb) != "N/A" and float(ffb) > 0 else "---"
+    disp_c = f"฿{cpo}" if is_open else "市場未開盤"
     
-    msg = f"{title} ({date_str})\n"
-    msg += f"🔸 FFB: {disp_f}\n"
-    msg += f"🔸 CPO: {disp_c}\n"
-    msg += f"🔸 基差: {basis if disp_c != '市場未開盤' else 'N/A'}\n"
-    msg += f"\n👉 查看網頁：{GITHUB_IO_URL}/index.html"
+    # 基差處理 (如果 CPO 有開盤但基差為 0，通常是 BMD 抓取失敗)
+    if is_open:
+        disp_b = f"฿{basis}" if basis != 0 else "⚠️ 數據延遲"
+    else:
+        disp_b = "N/A"
+    
+    msg = f"【{title}】\n"
+    msg += f"📅 日期：{date_str}\n"
+    msg += f"────────────────\n"
+    msg += f"🌿 FFB 收購價：{disp_f}\n"
+    msg += f"💧 CPO 現貨價：{disp_c}\n"
+    msg += f"📈 價差 (Basis)：{disp_b}\n"
+    msg += f"────────────────\n"
+    msg += f"🔗 最新完整報告與趨勢圖：\n{GITHUB_IO_URL}/index.html"
     
     url = "https://api.line.me/v2/bot/message/push"
     headers = {"Content-Type": "application/json", "Authorization": f"Bearer {LINE_CHANNEL_ACCESS_TOKEN}"}
