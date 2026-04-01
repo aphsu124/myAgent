@@ -43,7 +43,7 @@ def main():
     # 2. 防重複鎖
     html_name = f"{date_fn}_{suffix}.html"
     html_path = os.path.join(config.REPORT_DIR, html_name)
-    if os.path.exists(html_path):
+    if False:
         print(f"✅ 今日 {suffix} 已存在，跳過。"); return
 
     # 3. 抓取與分析 (強化數據採集)
@@ -87,17 +87,22 @@ def main():
 | BMD 期貨折算價 | {bmd_thb} | THB/kg |
 | 當日基差 (Basis) | {basis} | THB/kg |
 
----
-
 """
-    # 強力清理所有殘留符號、JSON 代碼塊與技術文字 (更廣泛的匹配模式)
-    clean_content = re.sub(r'(DATA_JSON:|json).*?({.*?}|```json.*?```)', '', content, flags=re.DOTALL | re.IGNORECASE)
+    # 強力清理技術文字 (中英文變體)
+    tech_patterns = [
+        r'(DATA_JSON|數據輸出\s*JSON|JSON\s*數據|json).*?({.*?}|```json.*?```)',
+        r'數據輸出\s*JSON:?\s*',
+        r'DATA_JSON:?\s*'
+    ]
+    clean_content = content
+    for pattern in tech_patterns:
+        clean_content = re.sub(pattern, '', clean_content, flags=re.DOTALL | re.IGNORECASE)
     
-    # 針對 Markdown 分隔線 (導致 · · · 亂碼的原因) 進行二次清理
-    clean_content = re.sub(r'^\s*([-*_\s]){3,}\s*$', '', clean_content, flags=re.MULTILINE)
+    # 物理刪除 Markdown 分隔線，從源頭根除 · · ·
+    clean_content = re.sub(r'^\s*([-*_=]){3,}\s*$', '', clean_content, flags=re.MULTILINE)
     
-    # 移除結尾可能出現的點、JSON 關鍵字或大括號殘留
-    clean_content = re.sub(r'(·|\.|\s|json|{|}|\s)*$', '', clean_content)
+    # 移除結尾所有殘留 (點、大括號、JSON 標記、技術字)
+    clean_content = re.sub(r'(·|\.|\s|json|{|}|\s|數據輸出|JSON|:)*$', '', clean_content, flags=re.IGNORECASE)
     final_content = summary_md + clean_content.strip()
     
     # C. 產出 PDF
