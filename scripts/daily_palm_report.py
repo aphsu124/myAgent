@@ -74,10 +74,12 @@ def main():
     bmd_thb, basis = excel_handler.update_data(date_ds, data.get('ffb'), data.get('cpo'), data.get('bmd_myr'), data.get('ex_rate'))
     excel_handler.generate_trend_chart() # 強制更新趨勢圖
     
-    # B. 格式化內容 (動態區分昨收/今收)
+    # B. 格式化內容 (動態區分昨收/今收，並確保表格前有空行)
     report_type_label = "昨日收盤" if suffix == "M_report" else "今日收盤"
     summary_md = f"""
+
 ## 📌 {report_type_label}核心數據快報 ({date_ds})
+
 | 指標項目 | 數值 | 單位 |
 | :--- | :--- | :--- |
 | FFB 鮮果收購價 | {data.get('ffb')} | THB/kg |
@@ -86,11 +88,13 @@ def main():
 | 當日基差 (Basis) | {basis} | THB/kg |
 
 ---
+
 """
-    # 強力清理所有殘留符號、JSON 代碼塊與技術文字 (使用多行匹配)
-    clean_content = re.sub(r'DATA_JSON:.*?({.*?}|```json.*?```)', '', content, flags=re.DOTALL)
-    clean_content = clean_content.replace('· · ·', '').replace('···', '').strip()
-    final_content = summary_md + clean_content
+    # 強力清理所有殘留符號、JSON 代碼塊與技術文字 (更廣泛的匹配模式)
+    clean_content = re.sub(r'(DATA_JSON:|json).*?({.*?}|```json.*?```)', '', content, flags=re.DOTALL | re.IGNORECASE)
+    # 移除結尾可能出現的點、JSON 關鍵字或大括號殘留
+    clean_content = re.sub(r'(·|\.|\s|json|{|}|\s)*$', '', clean_content)
+    final_content = summary_md + clean_content.strip()
     
     # C. 產出 PDF
     pdf_path = os.path.join(config.ICLOUD_BASE, f"{date_fn}_{suffix}.pdf")
