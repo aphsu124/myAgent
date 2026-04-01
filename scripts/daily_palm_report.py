@@ -92,22 +92,28 @@ def main():
 | 當日基差 (Basis) | {basis} | THB/kg |
 
 """
-    # 強力清理技術文字與角色殘留 (中英文變體)
-    tech_patterns = [
-        r'(DATA_JSON|數據輸出\s*JSON|JSON\s*數據|json).*?({.*?}|```json.*?```)',
-        r'數據輸出\s*JSON:?\s*',
-        r'DATA_JSON:?\s*',
+    # 強力清理技術文字與角色殘留 (改為非貪婪且不跨行的精準匹配)
+    # 1. 先拔除結尾的 JSON 區塊
+    clean_content = re.sub(r'```json.*?```', '', content, flags=re.DOTALL)
+    clean_content = re.sub(r'\{[^{}]*?"ffb"[^{}]*?\}', '', clean_content, flags=re.DOTALL)
+    
+    # 2. 拔除特定的技術標籤 (不使用 DOTALL，防止誤傷正文)
+    tech_labels = [
+        r'(?:DATA_JSON|數據輸出\s*JSON|JSON\s*數據|json)[:：]?\s*',
         r'資深分析師[:：]?\s*',
         r'我是.*?分析師.*?\n?'
     ]
-    clean_content = content
-    for pattern in tech_patterns:
-        clean_content = re.sub(pattern, '', clean_content, flags=re.DOTALL | re.IGNORECASE)
+    for pattern in tech_labels:
+        clean_content = re.sub(pattern, '', clean_content, flags=re.IGNORECASE)
     
-    # 物理刪除 Markdown 分隔線，從源頭根除 · · ·
+    # 3. 物理刪除分隔線與冗餘符號
     clean_content = re.sub(r'^\s*([-*_=]){3,}\s*$', '', clean_content, flags=re.MULTILINE)
     
-    # 移除結尾所有殘留 (點、大括號、JSON 標記、角色關鍵字)
+    # 4. 段落平滑化：僅合併純文字行的硬換行 (避開 Markdown 語法行)
+    # 只有當行尾不是標點符號，且下一行是純文字時才合併
+    clean_content = re.sub(r'([^\s!?,.:;！？，。：；])\n([^\s#\d\-\|一二三四])', r'\1\2', clean_content)
+    
+    # 移除結尾所有殘留標點與空格
     clean_content = re.sub(r'(·|\.|\s|json|{|}|\s|數據輸出|JSON|:|資深分析師)*$', '', clean_content, flags=re.IGNORECASE)
     final_content = summary_md + clean_content.strip()
     
