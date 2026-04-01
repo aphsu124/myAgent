@@ -92,6 +92,10 @@ def main():
 """
     # 強力清理所有殘留符號、JSON 代碼塊與技術文字 (更廣泛的匹配模式)
     clean_content = re.sub(r'(DATA_JSON:|json).*?({.*?}|```json.*?```)', '', content, flags=re.DOTALL | re.IGNORECASE)
+    
+    # 針對 Markdown 分隔線 (導致 · · · 亂碼的原因) 進行二次清理
+    clean_content = re.sub(r'^\s*([-*_\s]){3,}\s*$', '', clean_content, flags=re.MULTILINE)
+    
     # 移除結尾可能出現的點、JSON 關鍵字或大括號殘留
     clean_content = re.sub(r'(·|\.|\s|json|{|}|\s)*$', '', clean_content)
     final_content = summary_md + clean_content.strip()
