@@ -22,7 +22,7 @@ def _convert_md_table_to_data(table_lines):
     return data
 
 def generate_pdf_report(filename, title, date, ffb, cpo, content, table_data=None):
-    """產出 PDF (最終重構版：絕不遺失內容)"""
+    """產出 PDF (精緻排版版：修正符號誤傷與換行)"""
     try:
         doc = SimpleDocTemplate(filename, pagesize=A4, rightMargin=45, leftMargin=45, topMargin=40, bottomMargin=40)
         
@@ -42,19 +42,14 @@ def generate_pdf_report(filename, title, date, ffb, cpo, content, table_data=Non
         i = 0
         while i < len(lines):
             line = lines[i].strip()
-            
-            # 1. 處理空行
             if not line:
-                story.append(Spacer(1, 8))
-                i += 1
-                continue
+                story.append(Spacer(1, 8)); i += 1; continue
             
-            # 2. 偵測表格 (不推進 i，確保內部 while 處理完後主迴圈正確銜接)
+            # 1. 偵測表格
             if line.startswith('|') and i + 1 < len(lines) and '---' in lines[i+1]:
                 table_lines = []
                 while i < len(lines) and '|' in lines[i]:
-                    table_lines.append(lines[i])
-                    i += 1
+                    table_lines.append(lines[i]); i += 1
                 t_data = _convert_md_table_to_data(table_lines)
                 if t_data:
                     t = Table(t_data, colWidths=[150, 100, 100])
@@ -66,22 +61,23 @@ def generate_pdf_report(filename, title, date, ffb, cpo, content, table_data=Non
                         ('FONTSIZE', (0,0), (-1,-1), 10),
                     ]))
                     story.append(t); story.append(Spacer(1, 12))
-                continue # Table 處理完後已推進 i，直接下一次迴圈
+                continue
 
-            # 3. 處理大標題 (轉義文字以防崩潰)
+            # 2. 標題處理
             if line.startswith('##') or line.startswith('一、') or line.startswith('二、') or line.startswith('三、'):
                 txt = html.escape(line.replace('#', '').strip())
                 story.append(Paragraph(f"<b>{txt}</b>", h1_style))
+            elif line.startswith('1.') or line.startswith('2.') or line.startswith('3.') or line.startswith('4.') or (line.endswith('：') and len(line) < 30):
+                story.append(Paragraph(f"<b>{html.escape(line)}</b>", h2_style))
             
-            # 4. 處理中標題
-            elif line.startswith('1.') or line.startswith('2.') or line.startswith('3.') or (line.endswith('：') and len(line) < 30):
-                txt = html.escape(line)
-                story.append(Paragraph(f"<b>{txt}</b>", h2_style))
-            
-            # 5. 處理一般內容 (替換符號並轉義)
+            # 3. 內文處理 (精準替換行首符號，不影響行中橫線)
             else:
-                clean_txt = line.replace('-', '· ').replace('・', '· ').replace('•', '· ')
-                # 再次清理 Markdown 殘留
+                clean_txt = line
+                if clean_txt.startswith('- '): clean_txt = '· ' + clean_txt[2:]
+                elif clean_txt.startswith('・'): clean_txt = '· ' + clean_txt[1:]
+                elif clean_txt.startswith('•'): clean_txt = '· ' + clean_txt[1:]
+                
+                # 移除 Markdown 裝飾符
                 clean_txt = clean_txt.replace('*', '').replace('`', '')
                 story.append(Paragraph(html.escape(clean_txt), body_style))
             
@@ -90,5 +86,4 @@ def generate_pdf_report(filename, title, date, ffb, cpo, content, table_data=Non
         doc.build(story)
         return True
     except Exception as e:
-        print(f"PDF 產出失敗: {e}")
-        return False
+        print(f"PDF 產出失敗: {e}"); return False
