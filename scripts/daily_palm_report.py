@@ -43,7 +43,7 @@ def main():
     # 2. 防重複鎖
     html_name = f"{date_fn}_{suffix}.html"
     html_path = os.path.join(config.REPORT_DIR, html_name)
-    if False:
+    if os.path.exists(html_path):
         print(f"✅ 今日 {suffix} 已存在，跳過。"); return
 
     # 3. 抓取與分析 (強化數據採集)
