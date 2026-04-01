@@ -74,19 +74,23 @@ def main():
     bmd_thb, basis = excel_handler.update_data(date_ds, data.get('ffb'), data.get('cpo'), data.get('bmd_myr'), data.get('ex_rate'))
     excel_handler.generate_trend_chart() # 強制更新趨勢圖
     
-    # B. 格式化內容 (加入直覺的數據快報)
+    # B. 格式化內容 (動態區分昨收/今收)
+    report_type_label = "昨日收盤" if suffix == "M_report" else "今日收盤"
     summary_md = f"""
-## 📌 今日核心數據快報 ({date_ds})
+## 📌 {report_type_label}核心數據快報 ({date_ds})
 | 指標項目 | 數值 | 單位 |
 | :--- | :--- | :--- |
 | **FFB 鮮果收購價** | **{data.get('ffb')}** | THB/kg |
 | **CPO 毛油現貨價** | **{data.get('cpo')}** | THB/kg |
 | **BMD 期貨折算價** | **{bmd_thb}** | THB/kg |
-| **今日基差 (Basis)** | **{basis}** | THB/kg |
+| **當日基差 (Basis)** | **{basis}** | THB/kg |
 
 ---
 """
-    final_content = summary_md + content
+    # 強力清理所有殘留符號與 JSON
+    clean_content = re.sub(r'DATA_JSON: {.*?}', '', content)
+    clean_content = clean_content.replace('· · ·', '').replace('···', '').strip()
+    final_content = summary_md + clean_content
     
     # C. 產出 PDF
     pdf_path = os.path.join(config.ICLOUD_BASE, f"{date_fn}_{suffix}.pdf")
