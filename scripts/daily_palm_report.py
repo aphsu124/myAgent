@@ -11,52 +11,37 @@ from modules import config, excel_handler, pdf_handler, line_handler
 def get_palm_news(date_str):
     url = "https://google.serper.dev/search"
     res = ""
-    queries = [
-        f"Thailand palm oil FFB CPO price Krabi {date_str} -travel",
-        f"Bursa Malaysia CPO futures closing price {date_str}"
-    ]
+    queries = [f"Thailand palm oil FFB CPO price Krabi {date_str} -travel", f"Bursa Malaysia CPO futures closing price {date_str}"]
     for q in queries:
         try:
-            r = requests.post(url, headers={'X-API-KEY': config.SERPER_API_KEY}, 
-                             json={"q": q, "gl": "th", "hl": "en", "tbs": "qdr:m"})
+            r = requests.post(url, headers={'X-API-KEY': config.SERPER_API_KEY}, json={"q": q, "gl": "th", "hl": "en", "tbs": "qdr:m"})
             if r.status_code == 200:
-                for o in r.json().get('organic', []):
-                    res += f"\n{o.get('snippet')}\n"
+                for o in r.json().get('organic', []): res += f"\n{o.get('snippet')}\n"
         except: pass
     return res
 
 def main():
     ict_now = datetime.datetime.now(datetime.timezone(datetime.timedelta(hours=7)))
-    date_fn = ict_now.strftime("%Y%m%d")
-    date_ds = ict_now.strftime("%Y-%m-%d")
-    curr_hm = ict_now.strftime("%H:%M")
+    date_fn, date_ds, curr_hm = ict_now.strftime("%Y%m%d"), ict_now.strftime("%Y-%m-%d"), ict_now.strftime("%H:%M")
     
-    if "07:00" <= curr_hm < "13:30":
-        mode, title, suffix = "news_only", "📰 泰國棕櫚油晨間新聞", "M_report"
-    elif curr_hm >= "13:30":
-        mode, title, suffix = "full", "📊 泰國棕櫚油每日完整報告", "D_report"
+    if "07:00" <= curr_hm < "13:30": mode, title, suffix = "news_only", "📰 泰國棕櫚油晨間新聞", "M_report"
+    elif curr_hm >= "13:30": mode, title, suffix = "full", "📊 泰國棕櫚油每日完整報告", "D_report"
     else: return
 
-    html_path = os.path.join(config.REPORT_DIR, f"{date_fn}_{suffix}.html")
-    if os.path.exists(html_path): return
-
+    # 強制手動刷新邏輯
     print(f"🚀 啟動 {mode} 任務...")
     raw_data = get_palm_news(date_ds)
     raw_data += f"\n[Real-time Stats 4/1] Thailand FFB: 8.1 THB/kg, CPO: 45.5 THB/kg, BMD CPO: 4828 MYR/tonne, Ex-rate: 1 MYR = 7.78 THB.\n"
     
     client = genai.Client(api_key=config.GEMINI_API_KEY, http_options={'api_version': 'v1'})
-    prompt = f"""你是泰國棕櫚油資深分析師。今天是 {date_ds}。
-    請撰寫繁體中文「{'晨報' if mode=='news_only' else '日報'}」。
-    內容要求：
-    1. 針對 FFB、CPO 趨勢做詳細分析。
-    2. 解讀 BMD 期貨與匯率對基差的影響進行解讀。
-    3. 分析原因時，請列出至少 4 個關鍵點，並確保編號為 1. 2. 3. 4.。
-    4. 嚴禁在文中提到 JSON、DATA 或代碼塊字眼。
-    5. 嚴禁在結尾添加任何簽名、分析師姓名、日期或落款（例如：資深分析師、分析團隊、2026年...）。
-    6. 必須在【第一行】輸出數據：DATA_JSON: {{\"ffb\": 8.1, \"cpo\": 45.5, \"bmd_myr\": 4828, \"ex_rate\": 7.78}}
-    數據參考：{raw_data}"""
+    prompt = f"""你是資深分析師。今天是 {date_ds}。撰寫繁體中文「{'晨報' if mode=='news_only' else '日報'}」。
+    分析 FFB、CPO 與 BMD 基差。列出 4 個原因分析。
+    嚴禁提到 JSON。嚴禁包含任何簽名、日期或落款文字。
+    必須在【第一行】輸出數據：DATA_JSON: {{\"ffb\": 8.1, \"cpo\": 45.5, \"bmd_myr\": 4828, \"ex_rate\": 7.78}}
+    數據：{raw_data}"""
     
-    content, data = "無法生成報告。", {"ffb": 8.1, "cpo": 45.5, "bmd_myr": 4828, "ex_rate": 7.78}
+    data = {"ffb": 8.1, "cpo": 45.5, "bmd_myr": 4828, "ex_rate": 7.78}
+    content = "無法生成報告。"
     try:
         resp = client.models.generate_content(model="gemini-2.5-flash", contents=prompt, config={"max_output_tokens": 4096})
         if resp.text:
@@ -64,24 +49,25 @@ def main():
             m = re.search(r'DATA_JSON: ({.*?})', raw_text)
             if m: data = json.loads(m.group(1))
             
-            clean_content = re.sub(r'^.*?DATA_JSON:.*?\n', '', raw_text, flags=re.MULTILINE)
-            # 段落平滑化與落款清理
-            lines = clean_content.split('\n')
-            processed_lines = []
+            # [ 鋼鐵截斷邏輯 ]
+            # 1. 移除第一行 JSON
+            body = re.sub(r'^.*?DATA_JSON:.*?\n', '', raw_text, flags=re.MULTILINE)
+            # 2. 物理切割：只要看到關鍵字就切斷後方所有字串
+            for key in ["分析師", "分析团队", "2026年", "團隊", "您的姓名"]:
+                if key in body: body = body.split(key)[0]
+            
+            # 3. 段落流動化處理
+            lines, processed = body.split('\n'), []
             for line in lines:
-                line = line.strip()
-                if not line: processed_lines.append("")
-                # 更激進的過濾：攔截所有包含落款特徵的行
-                if re.search(r'(分析師|分析团队|2026年|您的姓名|簽名|團隊|落款)', line): continue
-                
-                if line.startswith(('#', '|', '-', '1.', '2.', '3.', '4.', '・')): processed_lines.append(line)
+                l = line.strip()
+                if not l: processed.append("")
+                elif l.startswith(('#', '|', '-', '1.', '2.', '3.', '4.')): processed.append(l)
                 else:
-                    if processed_lines and processed_lines[-1] != "" and not processed_lines[-1].startswith(('#', '|', '-', '1.', '2.', '3.', '4.', '・')):
-                        processed_lines[-1] += line
-                    else: processed_lines.append(line)
-            content = "\n".join(processed_lines).strip()
-            # 結尾二次清理：確保最後一行不是加粗的分析師字樣
-            content = re.sub(r'\n\*\*.*?(分析師|日期).*?\*\*.*$', '', content, flags=re.DOTALL)
+                    if processed and processed[-1] != "" and not processed[-1].startswith(('#', '|', '-', '1.', '2.', '3.', '4.')): processed[-1] += l
+                    else: processed.append(l)
+            content = "\n".join(processed).strip()
+            # 4. 結尾句號強制截斷 (雙重保險)
+            if "。" in content: content = content[:content.rfind("。")+1]
     except: pass
 
     bmd_thb, basis = excel_handler.update_data(date_ds, data.get('ffb'), data.get('cpo'), data.get('bmd_myr'), data.get('ex_rate'))
@@ -92,28 +78,19 @@ def main():
     
     final_content = summary_md + "\n\n" + content
     
-    # [ Council 最終極解決方案：句號後物理截斷 ]
-    # 尋找最後一個中文句號，將其後的所有內容 (落款) 徹底蒸發
-    last_period = final_content.rfind("。")
-    if last_period != -1 and last_period > len(summary_md):
-        final_content = final_content[:last_period+1]
-    
-    # 再次清理可能殘留的 Markdown 符號
-    final_content = final_content.strip()
-    
+    with open(os.path.join(config.BASE_DIR, "data/DEBUG_CONTENT.txt"), "w") as f: f.write(final_content)
     pdf_path = os.path.join(config.ICLOUD_BASE, f"{date_fn}_{suffix}.pdf")
     pdf_handler.generate_pdf_report(pdf_path, title, date_ds, data.get('ffb'), data.get('cpo'), final_content)
-
+    
     html_body = markdown.markdown(final_content, extensions=['tables'])
     web_content = f"<html><body style='background:#121212;color:#e0e0e0;padding:40px;font-family:sans-serif;'><h1>{title}</h1>{html_body}</body></html>"
     with open(os.path.join(config.BASE_DIR, "docs/index.html"), "w", encoding="utf-8") as f: f.write(web_content)
-
+    
     try:
         subprocess.run(["git", "add", "."], cwd=config.BASE_DIR, check=True)
-        subprocess.run(["git", "commit", "-m", f"📊 Layout Update {date_fn}"], cwd=config.BASE_DIR, check=True)
+        subprocess.run(["git", "commit", "-m", f"📊 Stable Reset {date_fn}"], cwd=config.BASE_DIR, check=True)
         subprocess.run(["git", "push", "origin", "main"], cwd=config.BASE_DIR, check=True)
     except: pass
-
     line_handler.send_push_notification(title, date_ds, data.get('ffb'), data.get('cpo'), basis)
 
 if __name__ == "__main__":
