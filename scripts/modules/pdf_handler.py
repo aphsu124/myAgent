@@ -21,10 +21,11 @@ def _convert_md_table_to_data(lines):
     return data
 
 def generate_pdf_report(filename, title, date, ffb, cpo, content, table_data=None):
-    """產出專業 PDF (修正分頁過大間隔與符號顯示問題)"""
+    """產出專業 PDF (修正標題誤食表格與分頁問題)"""
     try:
         doc = SimpleDocTemplate(filename, pagesize=A4, rightMargin=45, leftMargin=45, topMargin=40, bottomMargin=40)
         
+        # 定義樣式
         title_style = ParagraphStyle('T', fontName='Chinese', fontSize=22, leading=30, alignment=1, spaceAfter=25, textColor=colors.HexColor("#1A5276"))
         header_style = ParagraphStyle('H', fontName='Chinese', fontSize=11, leading=16, alignment=0, spaceAfter=5, textColor=colors.darkgrey)
         h1_style = ParagraphStyle('H1', fontName='Chinese', fontSize=15, leading=22, spaceBefore=12, spaceAfter=8, textColor=colors.HexColor("#2E86C1"))
@@ -40,7 +41,7 @@ def generate_pdf_report(filename, title, date, ffb, cpo, content, table_data=Non
         while i < len(lines):
             line = lines[i]
             
-            # A. 處理表格
+            # 1. 表格優先偵測 (放在最前面，防止被標題邏輯誤抓)
             if line.startswith('|') and i + 1 < len(lines) and '---' in lines[i+1]:
                 table_lines = []
                 while i < len(lines) and '|' in lines[i]:
@@ -60,11 +61,13 @@ def generate_pdf_report(filename, title, date, ffb, cpo, content, table_data=Non
                     story.append(t); story.append(Spacer(1, 15))
                 continue
 
-            # B. 處理標題 (不再將所有內文打包進 KeepTogether，只綁定標題與下一行)
+            # 2. 處理大標題 (檢查下一行是否為表格，如果是則不綁定)
             if line.startswith('##') or line.startswith('一、') or line.startswith('二、') or line.startswith('三、') or line.startswith('四、'):
                 clean_line = line.replace('#', '').strip()
                 header_p = Paragraph(f"<b>{clean_line}</b>", h1_style)
-                if i + 1 < len(lines):
+                
+                # 如果下一行不是表格，才進行綁定
+                if i + 1 < len(lines) and not lines[i+1].startswith('|'):
                     next_line = lines[i+1].replace('-', '· ').replace('・', '· ')
                     next_p = Paragraph(next_line, body_style)
                     story.append(KeepTogether([header_p, next_p]))
@@ -74,10 +77,10 @@ def generate_pdf_report(filename, title, date, ffb, cpo, content, table_data=Non
                     i += 1
                 continue
             
-            # C. 處理中標題
+            # 3. 處理中標題
             elif line.startswith('1.') or line.startswith('2.') or line.startswith('3.') or line.endswith('：'):
                 header_p = Paragraph(f"<b>{line}</b>", h2_style)
-                if i + 1 < len(lines):
+                if i + 1 < len(lines) and not lines[i+1].startswith('|'):
                     next_line = lines[i+1].replace('-', '· ').replace('・', '· ')
                     next_p = Paragraph(next_line, body_style)
                     story.append(KeepTogether([header_p, next_p]))
@@ -87,11 +90,14 @@ def generate_pdf_report(filename, title, date, ffb, cpo, content, table_data=Non
                     i += 1
                 continue
 
-            # D. 處理內文
+            # 4. 處理內文
             else:
-                clean_text = line.replace('-', '· ').replace('・', '· ').replace('•', '· ').replace('·', '· ')
-                clean_text = clean_text.replace('#','').replace('*','').replace('`','')
-                story.append(Paragraph(clean_text, body_style))
+                if line.startswith('|'): # 處理可能的零散表格行
+                    story.append(Paragraph(line, body_style))
+                else:
+                    clean_text = line.replace('-', '· ').replace('・', '· ').replace('•', '· ').replace('·', '· ')
+                    clean_text = clean_text.replace('#','').replace('*','').replace('`','')
+                    story.append(Paragraph(clean_text, body_style))
                 i += 1
             
         doc.build(story)
