@@ -11,7 +11,6 @@ from modules import config, excel_handler, pdf_handler, line_handler
 def get_palm_news(date_str):
     url = "https://google.serper.dev/search"
     res = ""
-    # 強化搜尋關鍵字
     queries = [
         f"Thailand palm oil FFB CPO price Krabi {date_str} -travel",
         f"Bursa Malaysia CPO futures closing price {date_str}"
@@ -40,98 +39,75 @@ def main():
     else:
         print(f"⏳ 非報告時段 ({curr_hm})，跳過。"); return
 
-    # 2. 防重複鎖
+    # 2. 防重複鎖 (開發調試期間可暫時註解)
     html_name = f"{date_fn}_{suffix}.html"
     html_path = os.path.join(config.REPORT_DIR, html_name)
     if False:
         print(f"✅ 今日 {suffix} 已存在，跳過。"); return
 
-    # 3. 抓取與分析 (強化數據採集)
+    # 3. 抓取與分析
     print(f"🚀 [模組化架構] 啟動 {mode} 任務...")
     raw_data = get_palm_news(date_ds)
-    
-    # 手動補入 4/1 的 Google 實時數據
     raw_data += f"\n[Real-time Stats 4/1] Thailand FFB: 8.1 THB/kg, CPO: 45.5 THB/kg, BMD CPO: 4828 MYR/tonne, Ex-rate: 1 MYR = 7.78 THB.\n"
     
     client = genai.Client(api_key=config.GEMINI_API_KEY, http_options={'api_version': 'v1'})
-    prompt = f"你是資深分析師。今天是 {date_ds}。撰寫繁體中文「{'晨報' if mode=='news_only' else '日報'}」。排除旅遊資訊。務必提取數據輸出 JSON: DATA_JSON: {{\"ffb\": 8.1, \"cpo\": 45.5, \"bmd_myr\": 4828, \"ex_rate\": 7.78}}。數據：{raw_data}"
+    prompt = f"""你是泰國棕櫚油資深分析師。今天是 {date_ds}。
+    請撰寫繁體中文「{'晨報' if mode=='news_only' else '日報'}」。
+    內容要求：
+    1. 深入分析 FFB、CPO 趨勢。
+    2. 解讀 BMD 期貨與匯率。
+    3. 嚴禁正文出現 JSON 或代碼塊。
+    4. 必須在【第一行】輸出數據，格式如下：
+    DATA_JSON: {{\"ffb\": 8.1, \"cpo\": 45.5, \"bmd_myr\": 4828, \"ex_rate\": 7.78}}
+    數據：{raw_data}"""
     
     content, data = "無法生成報告。", {"ffb": 8.1, "cpo": 45.5, "bmd_myr": 4828, "ex_rate": 7.78}
     try:
-        # 增加生成長度限制並優化
-        config_gen = {"max_output_tokens": 2048, "temperature": 0.7}
-        resp = client.models.generate_content(model="gemini-2.5-flash", contents=prompt, config=config_gen)
+        resp = client.models.generate_content(model="gemini-2.5-flash", contents=prompt, config={"max_output_tokens": 4096})
         if resp.text:
-            content = resp.text
-            # 1. 段落平滑化：移除段落內部的硬換行 (只有當下一行不符合新段落特徵時才合併)
-            content = re.sub(r'(?<!\n)\n(?![#\d\-\|一二三四])', ' ', content)
+            raw_text = resp.text
+            with open(os.path.join(config.BASE_DIR, "data/DEBUG_RAW.txt"), "w") as f: f.write(raw_text)
             
-            # 2. 數據提取 (相容多種格式)
-            m = re.search(r'(?:DATA_JSON|數據輸出\s*JSON|JSON\s*數據).*?({.*?})', content, flags=re.DOTALL | re.IGNORECASE)
-            if m: 
+            # 提取第一行數據
+            m = re.search(r'DATA_JSON: ({.*?})', raw_text)
+            if m:
                 try: data = json.loads(m.group(1))
                 except: pass
+            
+            # 剩餘全部內容視為正文 (排除第一行)
+            clean_content = re.sub(r'^.*?DATA_JSON:.*?\n', '', raw_text, flags=re.MULTILINE)
+            # 清除剩餘的技術標籤
+            clean_content = re.sub(r'```json.*?```', '', clean_content, flags=re.DOTALL)
+            content = clean_content.strip()
     except: pass
 
-    # 4. 調用專家模組執行任務
-    # A. 更新 Excel 與基差
+    # 4. 執行專家任務
     bmd_thb, basis = excel_handler.update_data(date_ds, data.get('ffb'), data.get('cpo'), data.get('bmd_myr'), data.get('ex_rate'))
-    excel_handler.generate_trend_chart() # 強制更新趨勢圖
+    excel_handler.generate_trend_chart()
     
-    # B. 格式化內容 (動態區分昨收/今收，並確保表格前有空行)
     report_type_label = "昨日收盤" if suffix == "M_report" else "今日收盤"
-    summary_md = f"""
-
-## 📌 {report_type_label}核心數據快報 ({date_ds})
-
-| 指標項目 | 數值 | 單位 |
-| :--- | :--- | :--- |
-| FFB 鮮果收購價 | {data.get('ffb')} | THB/kg |
-| CPO 毛油現貨價 | {data.get('cpo')} | THB/kg |
-| BMD 期貨折算價 | {bmd_thb} | THB/kg |
-| 當日基差 (Basis) | {basis} | THB/kg |
-
-"""
-    # [ Council 修復：極簡安全清理 ]
-    # 1. 記錄原始回應
-    with open(os.path.join(config.BASE_DIR, "data/DEBUG_RAW.txt"), "w", encoding="utf-8") as f:
-        f.write(content)
-
-    # 2. 物理截斷：只保留技術標籤之前的文字
-    clean_content = content
-    split_keys = ["DATA_JSON", "數據輸出 JSON", "JSON 數據", "```json"]
-    for key in split_keys:
-        if key in clean_content:
-            clean_content = clean_content.split(key)[0]
+    summary_md = f"\n## 📌 {report_type_label}核心數據快報 ({date_ds})\n\n| 指標項目 | 數值 | 單位 |\n| :--- | :--- | :--- |\n| FFB 鮮果收購價 | {data.get('ffb')} | THB/kg |\n| CPO 毛油現貨價 | {data.get('cpo')} | THB/kg |\n| BMD 期貨折算價 | {bmd_thb} | THB/kg |\n| 當日基差 (Basis) | {basis} | THB/kg |\n\n---\n"
     
-    # 3. 基礎雜質過濾 (僅限單行，不跨行)
-    clean_content = re.sub(r'资深分析师[:：]?\s*', '', clean_content)
-    clean_content = re.sub(r'^\s*([-*_=]){3,}\s*$', '', clean_content, flags=re.MULTILINE)
+    final_content = summary_md + "\n" + content
+    with open(os.path.join(config.BASE_DIR, "data/DEBUG_CONTENT.txt"), "w") as f: f.write(final_content)
     
-    final_content = summary_md + "\n" + clean_content.strip()
-    
-    # [ 偵錯輸出 ]
-    with open(os.path.join(config.BASE_DIR, "data/DEBUG_CONTENT.txt"), "w", encoding="utf-8") as f:
-        f.write(final_content)
-    
-    # C. 產出 PDF
+    # 產出 PDF
     pdf_path = os.path.join(config.ICLOUD_BASE, f"{date_fn}_{suffix}.pdf")
     pdf_handler.generate_pdf_report(pdf_path, title, date_ds, data.get('ffb'), data.get('cpo'), final_content)
 
-    # D. 更新網頁 (啟用表格擴展)
+    # 更新網頁
     html_body = markdown.markdown(final_content, extensions=['tables'])
     web_content = f"<html><body style='background:#121212;color:#e0e0e0;padding:40px;font-family:sans-serif;'><h1>{title}</h1>{html_body}</body></html>"
     with open(html_path, "w", encoding="utf-8") as f: f.write(web_content)
     with open(os.path.join(config.BASE_DIR, "docs/index.html"), "w", encoding="utf-8") as f: f.write(web_content)
 
-    # D. GitHub 同步
+    # GitHub 同步
     try:
         subprocess.run(["git", "add", "."], cwd=config.BASE_DIR, check=True)
         subprocess.run(["git", "commit", "-m", f"📊 Modular Update {date_fn}"], cwd=config.BASE_DIR, check=True)
         subprocess.run(["git", "push", "origin", "main"], cwd=config.BASE_DIR, check=True)
     except: pass
 
-    # E. LINE 推播
     line_handler.send_push_notification(title, date_ds, data.get('ffb'), data.get('cpo'), basis)
     print("✅ 全模組任務執行完畢。")
 
