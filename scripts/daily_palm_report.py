@@ -92,13 +92,16 @@ def main():
                     l = line.strip()
                     if not l: processed.append("")
                     elif l.startswith(('#', '|', '-', '1.', '2.', '3.', '4.', '・', '*')): 
-                        processed.append("\n" + l)
+                        if processed and processed[-1] == "": # 如果前一行是空行，則不重複加
+                            processed.append(l)
+                        else:
+                            processed.append("\n" + l)
                     else:
                         if processed and processed[-1] != "" and not processed[-1].startswith(('#', '|', '-', '1.', '2.', '3.', '4.', '・', '*', '###')): 
                             processed[-1] += l
                         else: processed.append(l)
                 
-                content = "\n".join(processed).replace("\n\n\n", "\n\n").strip()
+                content = "\n".join(processed).replace("\n\n\n", "\n\n").replace("\n\n###", "\n###").strip()
                 if "。" in content: content = content[:content.rfind("。")+1]
                 
                 # 品質審查
