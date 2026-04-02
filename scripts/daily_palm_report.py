@@ -82,18 +82,19 @@ def main():
                 # 段落修復與 Markdown 結構強化
                 body = re.sub(r'DATA_JSON:.*?$', '', raw_text, flags=re.MULTILINE).strip()
                 
-                # 修正冒號與加粗/斜體的組合瑕疵
-                body = re.sub(r'\*+\s*([^：\*\n]+)：\s*\*+', r'\n\n**\1：**\n', body)
-                body = re.sub(r'([0-9一二三四五].)\s*', r'\n\n### \1 ', body)
+                # 修正冒號與加粗標題 (只針對行首或雙星號包裹的項目)
+                body = re.sub(r'^\s*[\-\*]\s*\*\*([^\*：\n]+)：\*\*', r'\n- **\1：**', body, flags=re.MULTILINE)
+                # 修正章節標題 (必須在行首)
+                body = re.sub(r'^\s*([0-9一二三四五][.、])\s*', r'\n\n### \1 ', body, flags=re.MULTILINE)
                 
                 lines, processed = body.split('\n'), []
                 for line in lines:
                     l = line.strip()
                     if not l: processed.append("")
                     elif l.startswith(('#', '|', '-', '1.', '2.', '3.', '4.', '・', '*')): 
-                        processed.append("\n" + l) # 強制清單前有空行
+                        processed.append("\n" + l)
                     else:
-                        if processed and processed[-1] != "" and not processed[-1].startswith(('#', '|', '-', '1.', '2.', '3.', '4.', '・', '*')): 
+                        if processed and processed[-1] != "" and not processed[-1].startswith(('#', '|', '-', '1.', '2.', '3.', '4.', '・', '*', '###')): 
                             processed[-1] += l
                         else: processed.append(l)
                 
