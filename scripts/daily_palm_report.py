@@ -219,7 +219,9 @@ def main():
             subprocess.run(["git", "push", "origin", "main"], check=True, capture_output=True)
             print("✅ Git push 成功。")
         except subprocess.CalledProcessError as e:
-            print(f"⚠️ Git 操作失敗: {e.stderr.decode('utf-8', errors='ignore').strip()}")
+            err_msg = e.stderr.decode('utf-8', errors='ignore').strip()
+            print(f"⚠️ Git 操作失敗: {err_msg}")
+            line_handler.send_push_notification("🚨 網頁未更新警報", date_ds, 0, 0, f"Git push 失敗，網頁版報告未更新。\n原因：{err_msg[:80]}")
         
         # 僅在尚未發送過的情況下發送 LINE
         try:
