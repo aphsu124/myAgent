@@ -10,26 +10,23 @@
 - **詳細現況**：請參閱 `STATUS.md`。
 
 ## 🛠️ 工程規範與行為準則 (Standard Operating Procedures)
-當你執行任務時，請務必遵守以下「Jarvis 規範」：
+... (略)
 
-1. **報告產出標準**：
-   - 嚴禁解釋基本名詞 (FFB/CPO)。
-   - 嚴禁出現無關農產品 (如洋蔥、蘋果)。
-   - 必須包含 `DATA_JSON` 技術標籤以便系統解析。
-   - 內容必須具備「管理深度」，包含：影響分析、風險評估、建議策略。
+## 🔐 安全性與隱私規範 (Security & Privacy Protocol) - MANDATORY
+Claude, 你在執行任務時必須嚴格遵守以下安全性準則，這是 Jarvis 的最高指令：
 
-2. **檔案處理邏輯**：
-   - 更新網頁時，必須確保 `index.html` 包含 `no-cache` 標籤。
-   - 檔案小於 2500 bytes 時，視為低品質產出，嚴禁覆蓋主網頁。
+1. **憑證與 API 金鑰保護**：
+   - **嚴禁列印 (Print)**、**嚴禁日誌 (Log)** 或 **嚴禁提交 (Commit)** 任何 API Key、Secret、密碼或認證憑證。
+   - 保護 `.env` 檔案與 `.git` 目錄，嚴禁將其上傳或公開。
+   - 所有程式碼修改必須使用 `config.py` 或環境變數讀取方式，**嚴格禁止硬編碼 (Hard-coding)** 任何敏感資訊。
 
-3. **環境限制**：
-   - iCloud 檔案 (`/Users/bucksteam/Library/Mobile Documents/...`) 存取權限可能受限，修改代碼時需具備 `try-except` 容錯。
+2. **系統完整性**：
+   - 嚴格遵守 `.gitignore`，不要將敏感的臨時檔案或本地快取推送到 GitHub。
+   - 不得未經許可執行 `rm -rf` 或修改系統層級的配置檔案。
+
+3. **數據隱私與對外通訊**：
+   - 棕櫚油廠的營運數據（價格、庫存、聯絡人）為機密資訊，僅限於專案內部的 Python 腳本處理，嚴禁將原始數據傳送到未經授權的外部伺服器。
+   - 所有的通訊回報（如 LINE, Discord）必須確保發送對象與頻道正確。
 
 ## 📂 關鍵檔案路徑
-- 核心腳本：`scripts/daily_palm_report.py`
-- 品質驗證：`scripts/modules/validator.py`
-- 數據處理：`scripts/modules/excel_handler.py`
-- 歷史日誌：`data/DEBUG_RAW.txt`
-
----
-*Claude, 請接手 Jarvis 的思維模式，繼續優化本專案。*
+... (略)
