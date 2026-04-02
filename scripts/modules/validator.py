@@ -44,6 +44,12 @@ def is_report_valid(text):
     if not (re.search(r'[一1][.、]', text) and re.search(r'[二2][.、]', text)):
         return False, "缺少必要分析章節 (需包含至少兩個章節)"
 
+    # 黑名單檢查
+    blacklist = ["洋蔥", "波蘭", "蘋果", "無關", "FFB是", "CPO是指", "FFB 是", "CPO 是"]
+    found_blacklist = [b for b in blacklist if b in text]
+    if found_blacklist:
+        return False, f"包含無關產業資訊或低階解釋 (偵測到黑名單字詞: {', '.join(found_blacklist)})"
+
     if "DATA_JSON" in text: 
         return False, "包含技術雜質 (DATA_JSON 未清理乾淨)"
         
