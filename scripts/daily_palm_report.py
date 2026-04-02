@@ -79,21 +79,25 @@ def main():
                     try: data = json.loads(m.group(1))
                     except: pass
                 
-                # [ 物理清理 ]
+                # 段落修復與 Markdown 結構強化
                 body = re.sub(r'DATA_JSON:.*?$', '', raw_text, flags=re.MULTILINE).strip()
-                for key in ["分析師", "團隊", "姓名", "2026"]: 
-                    if key in body[-100:]: body = body[:-100] + body[-100:].split(key)[0]
                 
-                # 段落修復
+                # 修正冒號與加粗/斜體的組合瑕疵
+                body = re.sub(r'\*+\s*([^：\*\n]+)：\s*\*+', r'\n\n**\1：**\n', body)
+                body = re.sub(r'([0-9一二三四五].)\s*', r'\n\n### \1 ', body)
+                
                 lines, processed = body.split('\n'), []
                 for line in lines:
                     l = line.strip()
                     if not l: processed.append("")
-                    elif l.startswith(('#', '|', '-', '1.', '2.', '3.', '4.', '・')): processed.append(l)
+                    elif l.startswith(('#', '|', '-', '1.', '2.', '3.', '4.', '・', '*')): 
+                        processed.append("\n" + l) # 強制清單前有空行
                     else:
-                        if processed and processed[-1] != "" and not processed[-1].startswith(('#', '|', '-', '1.', '2.', '3.', '4.', '・')): processed[-1] += l
+                        if processed and processed[-1] != "" and not processed[-1].startswith(('#', '|', '-', '1.', '2.', '3.', '4.', '・', '*')): 
+                            processed[-1] += l
                         else: processed.append(l)
-                content = "\n".join(processed).strip()
+                
+                content = "\n".join(processed).replace("\n\n\n", "\n\n").strip()
                 if "。" in content: content = content[:content.rfind("。")+1]
                 
                 # 品質審查
