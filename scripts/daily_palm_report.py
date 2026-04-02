@@ -55,7 +55,7 @@ def main():
 
     while attempts < max_attempts and not is_valid:
         attempts += 1
-        print(f"🔄 正在進行第 {attempts} 次產出嘗試...")
+        import time; time.sleep(5); print(f"🔄 正在進行第 {attempts} 次產出嘗試...")
         
         prompt = f"""你是泰國甲米棕櫚油廠的首席營運官。今天是 {date_ds}。
         請根據新聞來源撰寫一份專業報告。
@@ -95,7 +95,7 @@ def main():
                 if "。" in content: content = content[:content.rfind("。")+1]
                 
                 # 品質審查
-                res_c, msg_c = validator.is_content_valid(content)
+                res_c, msg_c = validator.is_report_valid(content)
                 res_d, msg_d = validator.is_data_valid(data)
                 if res_c and res_d: is_valid = True
                 else: error_msg = f"{msg_c} | {msg_d}"
@@ -110,11 +110,94 @@ def main():
         final_content = summary_md + "\n" + content
         pdf_path = os.path.join(config.ICLOUD_BASE, f"{date_fn}_{suffix}.pdf")
         pdf_handler.generate_pdf_report(pdf_path, title, date_ds, data.get('ffb'), data.get('cpo'), final_content)
+        # [ 視覺大升級：高品質網頁模板 ]
+        css = """
+        :root {
+            --bg-color: #0f172a;
+            --card-bg: #1e293b;
+            --text-main: #f1f5f9;
+            --text-dim: #94a3b8;
+            --accent-green: #10b981;
+            --accent-blue: #38bdf8;
+            --border-color: #334155;
+        }
+        body {
+            background-color: var(--bg-color);
+            color: var(--text-main);
+            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", sans-serif;
+            line-height: 1.6;
+            margin: 0;
+            padding: 20px;
+            display: flex;
+            justify-content: center;
+        }
+        .container {
+            max-width: 900px;
+            width: 100%;
+            background: var(--card-bg);
+            padding: 40px;
+            border-radius: 16px;
+            box-shadow: 0 10px 25px -5px rgba(0, 0, 0, 0.3);
+            border: 1px solid var(--border-color);
+        }
+        h1 { color: var(--accent-blue); font-size: 2.2rem; margin-bottom: 30px; border-bottom: 2px solid var(--accent-blue); padding-bottom: 10px; }
+        h2 { color: var(--accent-green); font-size: 1.5rem; margin-top: 40px; }
+        h3 { color: var(--text-main); border-left: 4px solid var(--accent-green); padding-left: 15px; margin-top: 30px; }
+        table {
+            width: 100%;
+            border-collapse: collapse;
+            margin: 25px 0;
+            font-size: 1.1rem;
+            background: rgba(15, 23, 42, 0.5);
+            border-radius: 8px;
+            overflow: hidden;
+        }
+        th {
+            background-color: var(--accent-blue);
+            color: #000;
+            text-align: left;
+            padding: 15px;
+            font-weight: bold;
+        }
+        td {
+            padding: 15px;
+            border-bottom: 1px solid var(--border-color);
+        }
+        tr:nth-child(even) { background-color: rgba(255, 255, 255, 0.03); }
+        tr:hover { background-color: rgba(56, 189, 248, 0.1); }
+        hr { border: 0; border-top: 1px solid var(--border-color); margin: 40px 0; }
+        ul, li { margin-bottom: 10px; }
+        .meta-info { color: var(--text-dim); font-size: 0.9rem; margin-bottom: 20px; }
+        """
+
         html_body = markdown.markdown(final_content, extensions=['tables'])
-        web_content = f"<html><body style='background:#121212;color:#e0e0e0;padding:40px;font-family:sans-serif;'><h1>{title}</h1>{html_body}</body></html>"
-        with open(html_path, "w") as f: f.write(web_content)
-        with open(os.path.join(config.BASE_DIR, "docs/index.html"), "w") as f: f.write(web_content)
-        
+        web_content = f"""
+        <!DOCTYPE html>
+        <html lang="zh-TW">
+        <head>
+            <meta charset="UTF-8">
+            <meta name="viewport" content="width=device-width, initial-scale=1.0">
+            <meta http-equiv="cache-control" content="no-cache">
+            <meta http-equiv="pragma" content="no-cache">
+            <title>{title}</title>
+            <style>{css}</style>
+        </head>
+        <body>
+            <div class="container">
+                <div class="meta-info">系統：Jarvis Intelligence | 狀態：已通過品質檢核</div>
+                <h1>{title}</h1>
+                {html_body}
+                <div style="margin-top:50px; text-align:center; color:var(--text-dim); font-size:0.8rem;">
+                    © 2026 甲米棕櫚油廠 營運指揮中心
+                </div>
+            </div>
+        </body>
+        </html>
+        """
+
+        with open(html_path, "w", encoding="utf-8") as f: f.write(web_content)
+        with open(os.path.join(config.BASE_DIR, "docs/index.html"), "w", encoding="utf-8") as f: f.write(web_content)
+
         try:
             subprocess.run(["git", "add", "."], check=True)
             subprocess.run(["git", "commit", "-m", f"📊 Insight {date_fn}"], check=True)
