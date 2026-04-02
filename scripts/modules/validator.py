@@ -30,11 +30,24 @@ def is_meeting_valid(text):
     return True, "會議分析品質達標"
 
 def is_report_valid(text):
-    """檢查市場報告品質"""
-    if not text or len(text) < 500: return False, "報告字數不足"
-    if "一、" not in text or "二、" not in text: return False, "缺少分析章節"
-    if "DATA_JSON" in text: return False, "包含技術雜質"
-    return True, "市場報告品質通過"
+    """檢查市場報告品質 (V3 語義優先模式)"""
+    if not text or len(text) < 500: 
+        return False, f"報告字數不足 ({len(text) if text else 0} < 500)"
+    
+    # 深度特徵檢查
+    keywords = ["影響", "風險", "建議", "策略", "動態"]
+    found_keywords = [k for k in keywords if k in text]
+    if len(found_keywords) < 2:
+        return False, f"缺乏管理深度 (僅偵測到: {', '.join(found_keywords)})"
+
+    # 結構檢查 (彈性匹配 一、二、 或 1. 2.)
+    if not (re.search(r'[一1][.、]', text) and re.search(r'[二2][.、]', text)):
+        return False, "缺少必要分析章節 (需包含至少兩個章節)"
+
+    if "DATA_JSON" in text: 
+        return False, "包含技術雜質 (DATA_JSON 未清理乾淨)"
+        
+    return True, "市場報告品質通過 (V3)"
 
 def is_translation_valid(path):
     """檢查翻譯產出"""

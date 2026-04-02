@@ -76,9 +76,16 @@ def apply_excel_style():
 
 def update_data(date_str, ffb, cpo, bmd_myr, ex_rate):
     """更新數據並回傳計算結果"""
+    # 先進行計算，確保即便檔案存取失敗也能回傳正確數值
     try:
-        f_ffb, f_cpo, f_bmd, f_ex = map(lambda x: float(x) if str(x).replace('.','').isdigit() else 0.0, [ffb, cpo, bmd_myr, ex_rate])
-        bmd_thb = round((f_bmd / 1000) * f_ex, 2); basis = round(f_cpo - bmd_thb, 2) if f_cpo > 0 else 0.0
+        f_ffb, f_cpo, f_bmd, f_ex = map(lambda x: float(x) if str(x).replace('.','').replace('-','').isdigit() else 0.0, [ffb, cpo, bmd_myr, ex_rate])
+        bmd_thb = round((f_bmd / 1000) * f_ex, 2)
+        basis = round(f_cpo - bmd_thb, 2) if f_cpo > 0 else 0.0
+    except Exception as e:
+        print(f"數據計算失敗: {e}")
+        return 0, 0
+
+    try:
         new_row = pd.DataFrame({"Date": [date_str], "FFB": [f_ffb], "CPO": [f_cpo], "BMD_MYR": [f_bmd], "Exchange_Rate": [f_ex], "BMD_THB_kg": [bmd_thb], "Basis": [basis]})
         
         if os.path.exists(ICLOUD_EXCEL):
@@ -89,5 +96,7 @@ def update_data(date_str, ffb, cpo, bmd_myr, ex_rate):
             df.to_excel(ICLOUD_EXCEL, index=False)
         else: new_row.to_excel(ICLOUD_EXCEL, index=False)
         apply_excel_style()
-        return bmd_thb, basis
-    except Exception as e: print(f"Excel 數據更新失敗: {e}"); return 0, 0
+    except Exception as e: 
+        print(f"Excel 檔案更新失敗 (可能是權限問題): {e}")
+        
+    return bmd_thb, basis
