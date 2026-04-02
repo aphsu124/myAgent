@@ -123,8 +123,17 @@ def main():
         report_label = "昨日收盤" if suffix == "M_report" else "今日收盤"
         summary_md = f"## 📌 {report_label}核心數據快報 ({date_ds})\n\n| 指標項目 | 數值 | 單位 |\n| :--- | :--- | :--- |\n| FFB 鮮果收購價 | {data.get('ffb')} | THB/kg |\n| CPO 毛油現貨價 | {data.get('cpo')} | THB/kg |\n| BMD 期貨折算價 | {bmd_thb} | THB/kg |\n| 當日基差 (Basis) | {basis} | THB/kg |\n\n---\n"
         final_content = summary_md + "\n" + content
-        pdf_path = os.path.join(config.ICLOUD_BASE, f"{date_fn}_{suffix}.pdf")
+        pdf_path = f"/tmp/{date_fn}_{suffix}.pdf"
         pdf_handler.generate_pdf_report(pdf_path, title, date_ds, data.get('ffb'), data.get('cpo'), final_content)
+        if config.STORAGE_BACKEND == 'gdrive' and config.GDRIVE_FOLDER_BRIEFING:
+            from modules.gdrive_utils import upload_file
+            upload_file(pdf_path, config.GDRIVE_FOLDER_BRIEFING, "application/pdf")
+        else:
+            try:
+                import shutil
+                shutil.copy(pdf_path, os.path.join(config.ICLOUD_BASE, f"{date_fn}_{suffix}.pdf"))
+            except Exception as e:
+                print(f"⚠️ PDF 複製至 iCloud 失敗: {e}")
         # [ 視覺大升級：高品質網頁模板 ]
         css = """
         :root {

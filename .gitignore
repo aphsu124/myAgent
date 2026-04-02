@@ -5,3 +5,4 @@ __pycache__/
 cron_log.txt
 *.bak
 *.tmp
+config/gdrive_credentials.json
