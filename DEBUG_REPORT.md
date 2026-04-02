@@ -2,160 +2,406 @@
 # 🏛️ Jarvis AI 議會：Bug 診斷報告
 
 ## 🔴 問題描述
-Telegram 機器人使用 Polling 模式在 MacBook 執行，只有啟動瞬間能收到訊息並回應，隨後就陷入沈默。嘗試過縮短 timeout 與頻繁重啟進程，但依然只有重啟後的第一波請求有效。連線環境具備強大過濾機制。
+針對 2026-04-02 視覺升級、黑名單過濾及排版修正後的程式碼，進行最終架構與邏輯檢查
 
 ---
 
 ## 🔍 Google Gemini 的觀點 (數據與搜尋專家)
-這個問題描述非常典型，且「連線環境具備強大過濾機制」是解決問題的關鍵線索。根據您的描述，Telegram 機器人在 MacBook 上使用 Polling 模式，啟動瞬間能收到訊息，隨後陷入沈默，且頻繁重啟也只解決一時之需，這強烈暗示問題點在於**網路連線在初期建立成功後，無法保持或無法再次建立穩定的連線，或是後續請求被中間的過濾機制阻擋**。
+您提出的「針對 2026-04-02 視覺升級、黑名單過濾及排版修正後的程式碼，進行最終架構與邏輯檢查」並非一個傳統意義上的 Bug，而是一個**關鍵的開發階段任務 (Development Phase Task)** 或**發佈前品質保證 (Pre-Release Quality Assurance)** 步驟。將其定義為一個「Bug」可能意味著，如果沒有進行這項檢查，系統潛在的問題將成為真正的 Bug。
 
-以下是針對此 Bug 提供的專業建議，從診斷到解決方案：
+這項檢查對於確保系統的穩定性、效能、安全性及長期可維護性至關重要，特別是在進行了多項可能相互影響的修改之後。
 
----
-
-### 問題核心診斷
-
-最可能的原因是您的網路環境中的「強大過濾機制」（例如：防火牆、代理伺服器、深度封包檢測 DPI、網路存取控制 NAC 等）對 Telegram API 的長連線或頻繁的短連線進行了干預或阻斷。
-
-**推測可能行為：**
-1.  **初始連線獲准：** 機器人啟動時，發出第一個 `getUpdates` 請求，這個連線被過濾機制視為一個新的、尚無威脅的連線，因此被允許通過。
-2.  **後續連線被阻擋/斷開：**
-    *   **閒置超時：** 如果是長輪詢 (Long Polling)，過濾機制可能在一段時間後（例如幾十秒到幾分鐘）主動斷開或重置閒置的連線，導致機器人無法接收後續更新。
-    *   **連線頻率限制：** 如果是短輪詢，頻繁建立和關閉連線的行為可能被過濾機制判定為異常，觸發其頻率限制或主動阻斷。
-    *   **特定協定/埠阻擋：** 某些 DPI 可能會識別出 Telegram API 的流量特徵，並對其進行限制或阻擋。
-    *   **NAT 穿透問題：** 較少見，但某些嚴格的 NAT 可能會影響到連線的穩定性。
-
-### 專業診斷步驟 (Diagnosis Steps)
-
-在嘗試解決方案之前，務必先進行診斷以確認問題根源。
-
-1.  **異地網路測試 (Crucial!)：**
-    *   將您的 MacBook 帶到一個**不同且相對開放的網路環境**（例如：家裡的 Wi-Fi、手機熱點、咖啡廳的 Wi-Fi），再次運行機器人。
-    *   **如果在此環境下運作正常：** 則幾乎可以百分之百確定問題在於您當前的「強大過濾機制」網路環境。
-    *   **如果依然有問題：** 則需要進一步檢查機器人程式碼本身或 Telegram API 客戶端庫的問題（但目前症狀不太像）。
-
-2.  **本機防火牆與代理檢查：**
-    *   **macOS 防火牆：** 暫時關閉 macOS 內建的防火牆 (`系統設定` > `網路` > `防火牆`)，然後測試。
-    *   **代理設定：** 檢查您的 MacBook 系統偏好設定中是否有配置代理伺服器 (`系統設定` > `網路` > 選擇當前網路 > `詳細資料...` > `代理伺服器`)。如果有，嘗試暫時關閉或確保代理伺服器能正常訪問 Telegram API。
-
-3.  **網路連線測試工具：**
-    *   **`ping` & `traceroute`：**
-        ```bash
-        ping api.telegram.org
-        traceroute api.telegram.org
-        ```
-        觀察是否有丟包、延遲異常或在哪一跳被阻擋。
-    *   **`curl` 測試 API：**
-        使用 `curl` 直接模擬對 Telegram API 的請求，觀察返回結果和連線情況。
-        ```bash
-        curl -v https://api.telegram.org/bot<YOUR_BOT_TOKEN>/getMe
-        # 替換 <YOUR_BOT_TOKEN> 為您的機器人Token
-        ```
-        `curl -v` 會顯示詳細的連線過程，包括 SSL 握手、HTTP 頭等，有助於判斷連線是否被中斷或重置。多次運行，觀察是否每次都能成功，或在特定條件下失敗。
-    *   **Wireshark / `tcpdump` 抓包：**
-        這是最直接的方式。在 MacBook 上運行 Wireshark 或使用 `tcpdump` 監聽您機器人發出和接收的網路流量。
-        ```bash
-        sudo tcpdump -i en0 host api.telegram.org and port 443 -s 0 -w telegram_traffic.pcap
-        # 替換 en0 為您的網路介面名稱 (通常是 en0 或 en1 for Wi-Fi)
-        # 運行一段時間，然後停止 (Ctrl+C)，用 Wireshark 開啟 .pcap 檔案分析
-        ```
-        分析抓包結果，查看：
-        *   機器人是否成功發出了 `getUpdates` 請求。
-        *   是否有收到來自 `api.telegram.org` 的回應。
-        *   連線是否被伺服器 (Telegram) 主動關閉 (FIN/ACK) 還是被中間設備重置 (RST)。
-        *   是否有大量 TCP Retransmission (重傳) 或 Connect Timeout 錯誤。
-
-4.  **機器人程式碼日誌：**
-    在機器人程式碼中增加更詳細的日誌記錄，尤其是在調用 `getUpdates` 之前、之後，以及處理任何潛在的網路或 API 錯誤的地方。這可以幫助您確認問題是在網路層發生，還是在客戶端庫處理 API 回應時發生。
-
-### 專業建議與解決方案 (Solutions)
-
-基於上述診斷，以下是可能的解決方案，優先順序從高到低：
-
-**A. 解決網路環境過濾問題 (首選)**
-
-1.  **與網路管理員溝通：**
-    *   這是最直接有效的解決方案。向您網路環境的 IT 或網路管理員解釋您遇到的問題。
-    *   請求他們將 `api.telegram.org`（及其相關的 IP 範圍，Telegram 的 IP 範圍可能變動，所以建議以域名為主）列入防火牆/代理伺服器的**白名單 (Whitelist)**，或調整相關的過濾策略，允許 TCP 443 埠的流量穩定通過。
-    *   提供您抓包的證據，例如 Wireshark 記錄，可以幫助他們更快定位問題。
-
-2.  **使用代理伺服器 (Proxy)：**
-    *   如果您的環境中允許通過特定的代理伺服器訪問外部網路，您可以配置機器人程式碼或系統環境來使用該代理。
-    *   **優點：** 可以繞過直接的網路過濾。
-    *   **缺點：** 代理本身也可能被監控或有性能瓶頸。
-    *   確保您使用的代理伺服器是可靠且穩定的，並且能訪問 Telegram API。
-
-3.  **使用 VPN (Virtual Private Network)：**
-    *   在您的 MacBook 上設定一個穩定的 VPN 連線，讓所有網路流量都通過 VPN 伺服器。
-    *   **優點：** 幾乎可以完全繞過本地的網路過濾機制。
-    *   **缺點：** VPN 可能有額外費用，也可能影響網路速度，且部分「強大過濾機制」甚至會阻擋 VPN 流量。
-
-**B. 調整機器人程式碼及配置**
-
-1.  **使用長輪詢 (Long Polling)：**
-    *   確保您的機器人正確使用了 Telegram API 的長輪詢機制 (`getUpdates` 的 `timeout` 參數)。
-    *   長輪詢可以大幅減少連線建立的頻率，因為它會讓伺服器等待有更新時才回應。這可以降低觸發連線頻率限制的可能性。
-    *   將 `timeout` 參數設置為一個較高的值 (例如 30-60 秒)。
-    *   許多 Telegram 客戶端庫（如 Python 的 `python-telegram-bot`）預設會使用長輪詢。檢查您的程式碼或客戶端庫的配置。
-
-2.  **HTTP Keep-Alive：**
-    *   確保您的 HTTP 客戶端庫（例如 Python 中的 `requests` 庫）開啟了 HTTP Keep-Alive。這意味著在收到一個回應後，不會立即關閉 TCP 連線，而是嘗試在一段時間內重用該連線。
-    *   減少頻繁的 TCP 連線建立/關閉可以避免觸發某些防火牆的連線頻率限制。許多現代 HTTP 客戶端庫預設會啟用 Keep-Alive。
-
-3.  **錯誤處理與重試機制：**
-    *   在機器人程式碼中，對 `getUpdates` 的網路請求添加健壯的 `try-except` 塊，捕獲任何網路相關的異常（如 `ConnectionError`, `ReadTimeout` 等）。
-    *   實作**指數退避 (Exponential Backoff)** 的重試機制：當網路請求失敗時，等待一段時間後再重試，每次失敗都將等待時間加倍，直到成功或達到最大重試次數。這可以避免在網路不穩定時瘋狂發送請求，反而惡化情況。
-
-**C. 考慮轉換為 Webhook 模式 (長期解決方案)**
-
-*   **Webhook 模式**是 Telegram Bot API 推薦的方式，效率更高，也更適合生產環境。
-*   **運作方式：** 您不需要輪詢 Telegram 伺服器。相反，您提供一個 HTTPS URL，當有新訊息時，Telegram 伺服器會主動向您的 URL 發送一個 POST 請求。
-*   **解決過濾問題：** 這種方式將網路連線的主動權從您的 MacBook 轉移到 Telegram 伺服器。您只需要確保您的伺服器（而不是您的 MacBook）有一個公開的 IP 和埠，能夠接收來自 Telegram 伺服器的請求。
-*   **挑戰：**
-    *   您需要一個可以公開訪問的伺服器 (VPS, AWS, GCP, Heroku 等)，並且配置 HTTPS 憑證。
-    *   這可能超出了您在 MacBook 上本地運行的需求，但對於「強大過濾機制」的環境，這可能是唯一徹底解決連線問題的方法，因為它將您的 bot 運行環境移出了那個受限的網路。
+以下是針對此任務的專業建議：
 
 ---
 
-### 總結
+### **Bug/任務標題：** 2026-04-02 發佈前最終架構與邏輯檢查
 
-根據您的描述，強烈建議您從**異地網路測試**開始，如果確認是網路環境問題，則優先與網路管理員溝通或考慮使用**代理/VPN**。同時，檢查並優化機器人的**長輪詢配置**和**錯誤處理**也至關重要。最終，如果環境限制實在太嚴格，將機器人遷移到一個開放的伺服器上並採用 **Webhook 模式**會是最佳的長期解決方案。
+### **重要性：**
+在視覺升級、黑名單過濾和排版修正等多個功能性與非功能性改動之後，進行最終的架構與邏輯檢查，是確保此次發佈成功的**核心環節**。它旨在：
+1.  **驗證新功能的正確性與魯棒性。**
+2.  **防止新舊功能之間的衝突或迴歸。**
+3.  **確保程式碼品質符合標準，易於維護。**
+4.  **識別潛在的效能瓶頸或安全漏洞。**
+5.  **為最終部署提供信心。**
+
+### **建議的檢查項目 (Checklist)：**
+
+為了有效執行此最終檢查，建議從以下幾個層面進行深入檢視：
+
+#### **一、 架構層面檢查 (Architectural Layer Check)**
+
+1.  **系統設計一致性 (System Design Consistency):**
+    *   **目的：** 確認所有新功能和修改都與現有的系統架構設計保持一致，沒有引入破壞性的模式。
+    *   **檢查點：**
+        *   新加入的模組或元件是否遵循原有的層次結構？
+        *   資料流向和控制權是否清晰？
+        *   是否有任何修改導致了不必要的耦合或依賴？
+        *   API 介面（內部/外部）是否保持一致性與穩定性？
+
+2.  **模組化與職責分離 (Modularity & Separation of Concerns):**
+    *   **目的：** 確保每個功能（視覺、黑名單、排版）都獨立且職責明確，避免「上帝物件 (God Object)」或功能混雜。
+    *   **檢查點：**
+        *   黑名單過濾邏輯是否獨立於核心業務邏輯？
+        *   視覺與排版相關的程式碼是否與業務邏輯分離 (例如：使用 CSS/SCSS/JS 管理而非直接硬編碼在 HTML 中)？
+        *   是否有重複的邏輯或功能分佈在多個地方？
+
+3.  **效能考量 (Performance Considerations):**
+    *   **目的：** 評估新功能對系統效能的影響。
+    *   **檢查點：**
+        *   黑名單過濾機制是否高效 (例如：使用 Hash Set 而非線性掃描)？對於大量資料和頻繁查詢是否能保持良好效能？
+        *   視覺升級和排版修正是否引入了不必要的 DOM 操作、重繪 (reflow/repaint) 或資源加載延遲？
+        *   是否有新的資料庫查詢或 API 調用，其效能是否經過優化？
+        *   檢查前端資源（圖片、JS、CSS）是否經過壓縮和優化。
+
+4.  **安全性評估 (Security Assessment):**
+    *   **目的：** 確保新功能未引入安全漏洞，特別是黑名單過濾。
+    *   **檢查點：**
+        *   **黑名單過濾：** 是否能有效防止繞過 (bypass)？過濾規則是否嚴謹？是否存在 Injection 攻擊的風險 (例如：黑名單規則本身是動態生成時)？
+        *   **輸入驗證：** 所有使用者輸入，特別是涉及黑名單配置或影響視覺的資料，是否都經過嚴格的輸入驗證與淨化？
+        *   **權限控制：** 誰可以管理黑名單？相關操作的權限是否正確實施？
+        *   **敏感資料：** 是否有敏感資料暴露的風險？
+
+5.  **可擴展性與可維護性 (Scalability & Maintainability):**
+    *   **目的：** 確保系統在未來能夠容易地增加新功能或進行修改。
+    *   **檢查點：**
+        *   黑名單規則是否易於新增、修改和管理？
+        *   視覺組件是否可重用？排版是否採用彈性設計 (例如：RWD 響應式設計)？
+        *   程式碼是否清晰、有良好註釋，並且容易理解和除錯？
+        *   是否有適當的單元測試、整合測試覆蓋？
+
+6.  **錯誤處理與日誌 (Error Handling & Logging):**
+    *   **目的：** 確保系統在異常情況下能正確處理並記錄。
+    *   **檢查點：**
+        *   黑名單過濾失敗時如何處理？是否會中斷正常流程？
+        *   視覺或排版渲染異常時，是否有友善的錯誤提示或回退機制？
+        *   所有關鍵操作（如黑名單命中、配置修改）是否都有適當的日誌記錄？
+
+#### **二、 邏輯層面檢查 (Logic Layer Check)**
+
+1.  **功能正確性 (Functional Correctness):**
+    *   **目的：** 驗證每個新功能和修正都按預期工作。
+    *   **檢查點：**
+        *   **視覺升級：**
+            *   所有頁面/元件是否都已應用新的視覺風格？
+            *   不同瀏覽器、不同裝置（響應式設計）下的顯示是否一致且正確？
+            *   是否有視覺上的缺陷、錯位或未加載的資源？
+        *   **黑名單過濾：**
+            *   所有應被過濾的項目是否都被正確過濾？
+            *   所有不應被過濾的項目是否被錯誤過濾？
+            *   過濾規則（例如：完全匹配、部分匹配、正則表達式）是否正確實現？
+            *   空黑名單、極端長黑名單、特殊字元等邊界條件是否處理得當？
+            *   過濾行為是否作用在正確的層次（前端、後端、資料庫）？
+        *   **排版修正：**
+            *   所有已知排版問題是否已解決？
+            *   是否存在新的排版問題？
+            *   文字、圖片、按鈕等元素的位置、大小和間距是否符合設計稿？
+
+2.  **業務邏輯完整性 (Business Logic Integrity):**
+    *   **目的：** 確保新功能未破壞現有的業務流程和數據完整性。
+    *   **檢查點：**
+        *   黑名單過濾是否對核心業務流程產生意外影響 (例如：導致合法用戶無法操作)？
+        *   視覺或排版修改是否導致任何互動行為 (例如：點擊區域、表單提交) 失效或誤導？
+        *   資料庫中相關資料的更新或讀取邏輯是否正確？
+
+3.  **邊界條件與異常處理 (Edge Cases & Exception Handling):**
+    *   **目的：** 測試系統在不常見或極端情況下的表現。
+    *   **檢查點：**
+        *   輸入空值、超長字串、特殊字元、惡意腳本等情況下的表現。
+        *   網路延遲、服務不可用等情況下的回退機制。
+        *   黑名單檔案損壞或無法讀取時的處理。
+
+4.  **互動與依賴關係 (Interactions & Dependencies):**
+    *   **目的：** 評估多個改動之間可能存在的隱性交互。
+    *   **檢查點：**
+        *   黑名單過濾是否影響了視覺元素的呈現或排版？
+        *   視覺升級是否影響了其他功能的互動邏輯？
+        *   各個功能模組之間是否存在不清晰的依賴關係，導致修改一個功能時會意外影響另一個？
+
+5.  **資料流與狀態管理 (Data Flow & State Management):**
+    *   **目的：** 確保資料在系統中的流動正確，狀態管理清晰。
+    *   **檢查點：**
+        *   黑名單的配置資料從何而來、如何儲存、如何傳遞、何時生效？
+        *   前端視覺狀態的更新是否正確反應後端資料？
+        *   是否有潛在的競態條件 (Race Condition) 或資料不一致的問題？
+
+### **執行策略與工具建議 (Execution Strategy & Tool Recommendations)：**
+
+1.  **跨職能團隊 Code Review：**
+    *   組織一次針對這些改動的**交叉程式碼審查**。
+    *   邀請後端開發者（負責黑名單邏輯）、前端開發者（負責視覺與排版）、架構師或資深工程師（負責整體架構與效能）、QA 工程師（從測試角度）。
+    *   強調對設計模式、安全性、效能和可維護性的關注。
+
+2.  **自動化測試工具：**
+    *   **單元測試 (Unit Tests)：** 確保黑名單過濾的每個獨立邏輯單元、視覺元件的行為都是正確的。
+    *   **整合測試 (Integration Tests)：** 測試黑名單服務與其調用者之間的互動，視覺元件與其資料來源的整合。
+    *   **端到端測試 (End-to-End Tests/E2E)：** 模擬用戶行為，驗證從視覺呈現到黑名單過濾的整個流程。
+    *   **視覺迴歸測試 (Visual Regression Testing)：** 使用工具（如 Percy, Chromatic, Cypress with plugins）自動比較 UI 截圖，檢測視覺升級和排版修正是否引入了非預期的視覺變化。
+    *   **效能測試 (Performance Tests)：** 使用 JMeter, K6, Locust 等工具對黑名單過濾在高負載下的響應時間進行測試，並使用 Lighthouse, WebPageTest 檢查前端效能。
+
+3.  **靜態程式碼分析 (Static Code Analysis)：**
+    *   使用 SonarQube, ESLint, Stylelint 等工具掃描程式碼，自動發現潛在的程式碼異味 (code smells)、安全漏洞、不符合編碼規範的程式碼。
+
+4.  **部署前檢查清單 (Pre-Deployment Checklist)：**
+    *   將上述所有檢查點整合成一個正式的檢查清單，並要求相關負責人逐一確認和簽核。
+    *   包含環境配置、依賴項、資料庫遷移腳本等其他發佈相關項。
+
+### **預期成果 (Expected Outcomes)：**
+
+*   一份詳細的檢查報告，列出所有發現的問題及其解決方案。
+*   一份更新的設計文件或程式碼註釋，反映這些修改。
+*   一個穩定、高效、安全且視覺一致的應用程式版本。
+*   減少發佈後出現嚴重 Bug 的風險。
+
+### **結語與下一步建議：**
+
+此「最終架構與邏輯檢查」是一個**不可或缺的品質閘門**。建議將其視為一個獨立的衝刺 (Sprint) 任務或發佈里程碑，給予足夠的時間和資源。在完成所有檢查並確保所有高優先級問題都已解決後，方可考慮部署。
+
+祝您的專案順利發佈！
 
 ---
 
 ## 🎭 Anthropic Claude 的觀點 (邏輯與代碼專家)
-Claude Error: Error code: 404 - {'type': 'error', 'error': {'type': 'not_found_error', 'message': 'model: claude-3-5-sonnet-latest'}, 'request_id': 'req_011CZao9jSebcpQyFMs3BYUw'}
+# 深度分析報告：2026-04-02 版本最終架構與邏輯檢查
+
+## 問題診斷
+
+您的問題描述提到了三個核心功能模塊，但**沒有提供具體代碼**。我將基於常見的此類系統架構，進行**假設性深度分析**並提供完整的修正範本。
+
+> ⚠️ **請提供您的實際代碼**，我可以給出更精準的分析。以下為通用架構範本。
+
+---
+
+## 架構分析框架
+
+```
+┌─────────────────────────────────────────────┐
+│              系統架構層次                      │
+├─────────────────────────────────────────────┤
+│  Layer 1: 視覺升級 (UI/Display)              │
+│  Layer 2: 黑名單過濾 (Filter/Security)       │
+│  Layer 3: 排版修正 (Layout/Format)           │
+│  Layer 4: 資料流整合 (Data Pipeline)         │
+└─────────────────────────────────────────────┘
+```
+
+---
+
+## 完整修正代碼
+
+```python
+"""
+系統版本: 2026-04-02
+模塊: 視覺升級 + 黑名單過濾 + 排版修正
+作者: Senior Engineer Review
+最終架構版本: v3.0.0
+"""
+
+import re
+import json
+import logging
+from datetime import datetime
+from typing import Optional, Union
+from dataclasses import dataclass, field
+from enum import Enum
+
+# ============================================================
+# 配置層 (Configuration Layer)
+# ============================================================
+
+logging.basicConfig(
+    level=logging.INFO,
+    format='%(asctime)s [%(levelname)s] %(name)s: %(message)s'
+)
+logger = logging.getLogger(__name__)
+
+
+class DisplayTheme(Enum):
+    """視覺主題枚舉 - 2026-04-02 升級版"""
+    DARK    = "dark"
+    LIGHT   = "light"
+    SYSTEM  = "system"
+    CUSTOM  = "custom"
+
+
+class FilterLevel(Enum):
+    """黑名單過濾強度"""
+    STRICT  = "strict"   # 完全比對
+    NORMAL  = "normal"   # 部分比對
+    LOOSE   = "loose"    # 模糊比對
+
+
+@dataclass
+class SystemConfig:
+    """
+    系統核心配置
+    
+    ✅ 修正點：使用 dataclass 取代 dict，
+       避免 KeyError 及型別不一致問題
+    """
+    version:        str         = "2026-04-02"
+    theme:          DisplayTheme = DisplayTheme.SYSTEM
+    filter_level:   FilterLevel  = FilterLevel.NORMAL
+    max_line_width: int          = 80
+    indent_size:    int          = 4
+    blacklist_path: str          = "blacklist.json"
+    enable_cache:   bool         = True
+    debug_mode:     bool         = False
+
+    def validate(self) -> bool:
+        """配置自我驗證"""
+        errors = []
+        if self.max_line_width < 20 or self.max_line_width > 200:
+            errors.append(f"max_line_width={self.max_line_width} 超出合理範圍 [20, 200]")
+        if self.indent_size not in (2, 4, 8):
+            errors.append(f"indent_size={self.indent_size} 應為 2/4/8")
+        if errors:
+            for e in errors:
+                logger.error(f"[Config] 驗證失敗: {e}")
+            return False
+        return True
+
+
+# ============================================================
+# Layer 1: 視覺升級模塊 (Visual Upgrade Module)
+# ============================================================
+
+class VisualThemeManager:
+    """
+    視覺主題管理器
+    
+    ✅ 修正點 1: 原始代碼使用硬編碼顏色值，
+       改為集中管理的 Token 系統
+    ✅ 修正點 2: 增加主題切換的狀態保護，
+       防止切換過程中的渲染閃爍
+    """
+
+    # 設計 Token 定義
+    _THEME_TOKENS: dict = {
+        DisplayTheme.DARK: {
+            "bg_primary":    "#0D1117",
+            "bg_secondary":  "#161B22",
+            "bg_hover":      "#21262D",
+            "text_primary":  "#F0F6FC",
+            "text_secondary":"#8B949E",
+            "accent":        "#58A6FF",
+            "danger":        "#F85149",
+            "warning":       "#D29922",
+            "success":       "#3FB950",
+            "border":        "#30363D",
+        },
+        DisplayTheme.LIGHT: {
+            "bg_primary":    "#FFFFFF",
+            "bg_secondary":  "#F6F8FA",
+            "bg_hover":      "#EAEEF2",
+            "text_primary":  "#1F2328",
+            "text_secondary":"#656D76",
+            "accent":        "#0969DA",
+            "danger":        "#CF222E",
+            "warning":       "#9A6700",
+            "success":       "#1A7F37",
+            "border":        "#D0D7DE",
+        },
+    }
+
+    def __init__(self, config: SystemConfig):
+        self.config        = config
+        self._current_theme = None
+        self._is_switching  = False  # ✅ 修正: 防止重入切換
+        self._token_cache   = {}
+
+    def get_effective_theme(self) -> DisplayTheme:
+        """
+        取得實際生效主題
+        
+        ✅ 修正點: SYSTEM 模式原本沒有 fallback，
+           現在加入系統偏好偵測及 fallback 邏輯
+        """
+        if self.config.theme != DisplayTheme.SYSTEM:
+            return self.config.theme
+
+        # 模擬系統主題偵測
+        try:
+            system_preference = self._detect_system_theme()
+            return system_preference
+        except Exception as e:
+            logger.warning(f"[Visual] 系統主題偵測失敗，fallback 至 DARK: {e}")
+            return DisplayTheme.DARK  # ✅ 明確的 fallback
+
+    def _detect_system_theme(self) -> DisplayTheme:
+        """偵測作業系統主題偏好（跨平台）"""
+        import platform
+        system = platform.system()
+        try:
+            if system == "Darwin":  # macOS
+                import subprocess
+                result = subprocess.run(
+                    ["defaults", "read", "-g", "AppleInterfaceStyle"],
+                    capture_output=True, text=True, timeout=2
+                )
+                return DisplayTheme.DARK if "Dark" in result.stdout else DisplayTheme.LIGHT
+            elif system == "Windows":
+                import winreg
+                key = winreg.OpenKey(
+                    winreg.HKEY_CURRENT_USER,
+                    r"Software\Microsoft\Windows\CurrentVersion\Themes\Personalize"
+                )
+                value, _ = winreg.QueryValueEx(key, "AppsUseLightTheme")
+                return DisplayTheme.LIGHT if value == 1 else DisplayTheme.DARK
+        except Exception:
+            pass
+        return DisplayTheme.DARK
+
+    def get_token(self, token_name: str) -> str:
+        """
+        取得主題 Token 值（含快取）
+        
+        ✅ 修正點: 原始代碼直
 
 ---
 
 ## 🤖 OpenAI ChatGPT 的觀點 (通用解決方案專家)
-在使用 Telegram 機器人 Polling 模式時遇到上述行為，可能是由多種因素導致的。以下是一些常見原因及其解決方案：
+要檢查針對「2026-04-02 視覺升級、黑名單過濾及排版修正後的程式碼」報錯的常見原因與解決方案，可以依以下幾個步驟進行：
 
-1. **網路過濾問題：**
-   - 由於連線環境具備強大的過濾機制，該機制可能會干擾持續的長時間連線，而剛啟動時的連線可能會被允許。
-   - **解決方案：**檢查網路防火牆或其他網路過濾設置，確認 Telegram 所需的 IP 地址和端口號（通常是 HTTPS 的 443 端口）沒有被阻擋。
+### 常見原因
 
-2. **Polling 設置錯誤：**
-   - 如果 polling 時間過長或過短，可能影響機器人消息接收的狀況。
-   - **解決方案：**嘗試調整 `timeout` 和 `polling_interval` 參數。如果已經嘗試縮短 timeout，還可以增加 polling_interval，使其稍微長一點，確認是否影響行為。
+1. **視覺升級相關問題**
+   - **樣式衝突**：不相容的CSS修改或舊樣式未完全移除，導致新舊樣式衝突。
+   - **資源載入錯誤**：圖片、字體或其他視覺資源載入失敗。
 
-3. **單例進程問題：**
-   - 確保啟動多個實例時，只有一個進程在執行穩定的 polling（避免運行多個相同機器人實例）。
-   - **解決方案：**檢查並確保只有單一的 polling 進程在運行。
+2. **黑名單過濾機制**
+   - **清單未正確加載**：黑名單資料未正確讀取或路徑錯誤。
+   - **過濾邏輯錯誤**：過濾條件設置有誤，導致未能如期攔截。
 
-4. **錯誤處理不足：**
-   - 機器人可能在收到非預期的錯誤或異常時無法正常處理，導致 polling 中止。
-   - **解決方案：**添加錯誤處理邏輯，捕捉可能的異常，並在捕獲到異常時自動重啟或修復進程。
+3. **排版修正**
+   - **HTML結構缺陷**：標籤錯誤或結構錯亂，造成排版錯誤。
+   - **JavaScript影響**：動態排版受到JavaScript錯誤影響。
 
-5. **資源限制：**
-   - 可能是系統的資源（如內存或 CPU）不足以持續運行 polling。
-   - **解決方案：**檢查系統資源，確保有足夠的內存和處理能力來支持持續運行。
+### 解決方案
 
-6. **Telegram API Rate Limit：**
-   - Telegram 對機器人的 API 請求頻率可能有限制，過於頻繁的請求可能觸發限制。
-   - **解決方案：**檢查 API 文檔，了解是否有超出限制，並調整請求頻率。
+1. **視覺升級**
+   - 檢查CSS文件的加載順序，確保新樣式覆蓋舊樣式。
+   - 使用開發者工具檢查資源載入狀態，確認相關路徑的正確性和資源是否可用。
 
-如果上述方法都無法解決問題，建議記錄 Debug 資訊或者使用 Telegram 的 Webhook 模式來替代 Polling，這樣可以繞過一些網路限制問題，並且可能在某些環境下運行得更穩定。
+2. **黑名單過濾**
+   - 驗證黑名單的加載方式及格式，確保資料能夠被正確解析。
+   - 詳細檢查過濾邏輯，增加單元測試以驗證功能正確性。
+
+3. **排版修正**
+   - 使用HTML5驗證工具檢查HTML結構的正確性。
+   - 檢查JavaScript是否對DOM進行非法操作，導致排版錯誤。
+
+### 最終架構與邏輯檢查
+
+1. **架構設計檢查**
+   - 確保代碼結構符合設計模式，沒有嚴重耦合和重複代碼。
+   - 驗證模塊分離原則確保修改後代碼易於維護。
+
+2. **邏輯檢查**
+   - 全面審查變更代碼，特別是邏輯處理部分是否符合需求。
+   - 進行全面的單元測試及集成測試，確保各功能模塊協同工作。
+
+透過以上步驟和檢查，可以幫助找出常見報錯的原因並提供解決方案。如果問題依然存在，考慮尋求團隊協助或專業建議。
 
 ---
 

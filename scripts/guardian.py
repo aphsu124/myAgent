@@ -74,8 +74,8 @@ def _diagnose_and_alert(task, error):
         resp = client.models.generate_content(model="gemini-2.0-flash", contents=prompt)
         analysis = resp.text if resp.text else "無法分析"
         print(f"🤖 AI 診斷建議: {analysis}")
-        # 這裡可以進一步實施自動修復代碼邏輯 (Phase 3)
-    except: pass
+    except Exception as e:
+        print(f"⚠️ AI 診斷失敗 (不影響主流程): {e}")
 
 def _final_failure_alert(task, error):
     """發送最終失敗警報到 LINE"""

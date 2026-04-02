@@ -29,8 +29,19 @@ def send_push_notification(title, date_str, ffb, cpo, basis):
     url = "https://api.line.me/v2/bot/message/push"
     headers = {"Content-Type": "application/json", "Authorization": f"Bearer {LINE_CHANNEL_ACCESS_TOKEN}"}
     payload = {"to": LINE_USER_ID, "messages": [{"type": "text", "text": msg}]}
-    
-    try:
-        r = requests.post(url, headers=headers, json=payload)
-        return r.status_code == 200
-    except: return False
+
+    import time
+    for attempt in range(3):
+        try:
+            r = requests.post(url, headers=headers, json=payload, timeout=15)
+            if r.status_code == 200:
+                return True
+            print(f"⚠️ LINE 推播失敗 (attempt {attempt+1}/3): HTTP {r.status_code} - {r.text[:100]}")
+        except requests.exceptions.Timeout:
+            print(f"⚠️ LINE 推播逾時 (attempt {attempt+1}/3)")
+        except Exception as e:
+            print(f"⚠️ LINE 推播錯誤 (attempt {attempt+1}/3): {e}")
+        if attempt < 2:
+            time.sleep(5)
+    print("🚨 LINE 推播 3 次重試全部失敗")
+    return False

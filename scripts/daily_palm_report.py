@@ -16,10 +16,15 @@ def get_palm_news(date_str):
     queries = [f"Thailand palm oil FFB CPO market news {date_str}", f"BMD palm oil futures analysis {date_str}"]
     for q in queries:
         try:
-            r = requests.post(url, headers={'X-API-KEY': config.SERPER_API_KEY}, json={"q": q, "gl": "th", "hl": "en", "tbs": "qdr:m"})
+            r = requests.post(url, headers={'X-API-KEY': config.SERPER_API_KEY}, json={"q": q, "gl": "th", "hl": "en", "tbs": "qdr:m"}, timeout=15)
             if r.status_code == 200:
                 for o in r.json().get('organic', []): res += f"\n{o.get('snippet')}\n"
-        except: pass
+            else:
+                print(f"⚠️ Serper API 回應異常: HTTP {r.status_code}")
+        except requests.exceptions.Timeout:
+            print(f"⚠️ Serper 搜尋逾時 (query: {q[:50]})")
+        except Exception as e:
+            print(f"⚠️ Serper 搜尋失敗: {e}")
     return res
 
 def main():
@@ -209,13 +214,20 @@ def main():
         with open(os.path.join(config.BASE_DIR, "docs/index.html"), "w", encoding="utf-8") as f: f.write(web_content)
 
         try:
-            subprocess.run(["git", "add", "."], check=True)
-            subprocess.run(["git", "commit", "-m", f"📊 Insight {date_fn}"], check=True)
-            subprocess.run(["git", "push", "origin", "main"], check=True)
-        except: pass
+            subprocess.run(["git", "add", "."], check=True, capture_output=True)
+            subprocess.run(["git", "commit", "-m", f"📊 Insight {date_fn}"], check=True, capture_output=True)
+            subprocess.run(["git", "push", "origin", "main"], check=True, capture_output=True)
+            print("✅ Git push 成功。")
+        except subprocess.CalledProcessError as e:
+            print(f"⚠️ Git 操作失敗: {e.stderr.decode('utf-8', errors='ignore').strip()}")
         
         # 僅在尚未發送過的情況下發送 LINE
-        if not os.path.exists(sent_log) or today_key not in open(sent_log).read():
+        try:
+            sent_content = open(sent_log, encoding="utf-8").read() if os.path.exists(sent_log) else ""
+        except Exception as e:
+            print(f"⚠️ 讀取發送日誌失敗: {e}")
+            sent_content = ""
+        if today_key not in sent_content:
             line_handler.send_push_notification(title, date_ds, data.get('ffb'), data.get('cpo'), basis)
             with open(sent_log, "a") as f: f.write(today_key + "\n")
             print("✅ 深度報告發布成功。")
