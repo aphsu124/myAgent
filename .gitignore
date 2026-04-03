@@ -8,3 +8,4 @@ cron_log.txt
 config/gdrive_credentials.json
 config/oauth_client.json
 config/oauth_token.json
+.DS_Store
