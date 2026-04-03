@@ -45,6 +45,12 @@ class JarvisMonitor(rumps.App):
     @rumps.timer(30)
     def update(self, _):
         try:
+            try:
+                from modules.anthropic_usage_sync import sync_today
+                sync_today()
+            except Exception:
+                pass
+
             summary       = get_today_summary()
             month_summary = get_month_summary()
             month_total   = get_month_total_cost()
@@ -79,10 +85,11 @@ class JarvisMonitor(rumps.App):
                     val = fmt_cost(d['cost_usd'])
 
                 # 燈號判斷：Gemini 看今日用量 %，Claude/OpenAI 看月累計費用
+                # usage_percent 已是 0-100，直接與閾值*100 比較
                 if d['has_free_tier']:
-                    if pct is not None and pct * 100 >= ALERT_THRESHOLD * 100:
+                    if pct is not None and pct >= ALERT_THRESHOLD * 100:
                         indicator = '🔴'
-                    elif pct is not None and pct * 100 >= WARN_THRESHOLD * 100:
+                    elif pct is not None and pct >= WARN_THRESHOLD * 100:
                         indicator = '🟡'
                     else:
                         indicator = ''
@@ -111,6 +118,10 @@ class JarvisMonitor(rumps.App):
                 )
             lines.append('─' * 36)
             lines.append(f"本月累計：${month_total:.4f}")
+            if os.getenv('ANTHROPIC_ADMIN_KEY'):
+                lines.append('※ Claude Code 用量已同步（Admin API）')
+            else:
+                lines.append('※ Claude Code CLI 未設定 Admin Key')
             self.menu['詳細資訊'].title = '\n'.join(lines)
 
             # ── 系統通知（每個指標只通知一次）──
@@ -119,15 +130,15 @@ class JarvisMonitor(rumps.App):
                 prov  = d['provider']
                 pct   = d['usage_percent']
 
-                # Gemini：今日用量 %
+                # Gemini：今日用量 %（usage_percent 已是 0-100）
                 if pct is not None:
                     last = self._last_alert.get(model, 0)
-                    if pct * 100 >= ALERT_THRESHOLD * 100 and last < ALERT_THRESHOLD:
-                        os.system(f'osascript -e \'display notification "{model} 用量已達 {pct*100:.0f}%！" with title "Jarvis Monitor 🔴"\'')
-                        self._last_alert[model] = ALERT_THRESHOLD
-                    elif pct * 100 >= WARN_THRESHOLD * 100 and last < WARN_THRESHOLD:
-                        os.system(f'osascript -e \'display notification "{model} 用量達 {pct*100:.0f}%，請注意" with title "Jarvis Monitor 🟡"\'')
-                        self._last_alert[model] = WARN_THRESHOLD
+                    if pct >= ALERT_THRESHOLD * 100 and last < ALERT_THRESHOLD * 100:
+                        os.system(f'osascript -e \'display notification "{model} 用量已達 {pct:.0f}%！" with title "Jarvis Monitor 🔴"\'')
+                        self._last_alert[model] = ALERT_THRESHOLD * 100
+                    elif pct >= WARN_THRESHOLD * 100 and last < WARN_THRESHOLD * 100:
+                        os.system(f'osascript -e \'display notification "{model} 用量達 {pct:.0f}%，請注意" with title "Jarvis Monitor 🟡"\'')
+                        self._last_alert[model] = WARN_THRESHOLD * 100
 
                 # Claude / OpenAI：月累計費用
                 if not d['has_free_tier']:
