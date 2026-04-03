@@ -18,7 +18,32 @@ CREDENTIALS_PATH = os.getenv(
     os.path.join(os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__)))), "config/gdrive_credentials.json")
 )
 
+BASE_DIR_UTILS = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+OAUTH_TOKEN_PATH = os.path.join(BASE_DIR_UTILS, 'config/oauth_token.json')
+
 _drive_service = None
+_user_drive_service = None
+
+def _get_user_drive_service():
+    """使用 OAuth2 使用者憑證（用於新建檔案，空間計入使用者帳號）"""
+    global _user_drive_service
+    if _user_drive_service is not None:
+        return _user_drive_service
+    if not os.path.exists(OAUTH_TOKEN_PATH):
+        return None
+    try:
+        from google.oauth2.credentials import Credentials as UserCredentials
+        from google.auth.transport.requests import Request
+        creds = UserCredentials.from_authorized_user_file(OAUTH_TOKEN_PATH, SCOPES)
+        if creds.expired and creds.refresh_token:
+            creds.refresh(Request())
+            with open(OAUTH_TOKEN_PATH, 'w') as f:
+                f.write(creds.to_json())
+        _user_drive_service = build('drive', 'v3', credentials=creds)
+        return _user_drive_service
+    except Exception as e:
+        print(f"⚠️ OAuth2 使用者憑證載入失敗: {e}")
+        return None
 
 def _get_drive_service():
     """單例：整個程序生命週期只建立一次連線"""
@@ -67,6 +92,26 @@ def upload_file(local_path, folder_id, mime_type=None):
             return f.get('id')
     except Exception as e:
         print(f"⚠️ Drive 上傳失敗 ({local_path}): {e}")
+        return None
+
+def create_file(local_path, folder_id, mime_type=None):
+    """用 OAuth2 使用者憑證新建檔案（每次都建新的，保留歷史）。回傳 file_id"""
+    if not mime_type:
+        mime_type, _ = mimetypes.guess_type(local_path)
+        mime_type = mime_type or 'application/octet-stream'
+    filename = os.path.basename(local_path)
+    svc = _get_user_drive_service()
+    if not svc:
+        print(f"⚠️ OAuth token 不存在，改用 upload_file() fallback")
+        return upload_file(local_path, folder_id, mime_type)
+    try:
+        media = MediaFileUpload(local_path, mimetype=mime_type)
+        meta  = {'name': filename, 'parents': [folder_id]}
+        f = svc.files().create(body=meta, media_body=media, fields='id').execute()
+        print(f"⬆️  Drive 新建（使用者帳號）: {filename}")
+        return f.get('id')
+    except Exception as e:
+        print(f"⚠️ Drive 新建失敗 ({filename}): {e}")
         return None
 
 def upload_bytes(content, filename, folder_id, mime_type):

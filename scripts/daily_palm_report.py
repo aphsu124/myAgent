@@ -130,8 +130,8 @@ def main():
         pdf_path = f"/tmp/{date_fn}_{suffix}.pdf"
         pdf_handler.generate_pdf_report(pdf_path, title, date_ds, data.get('ffb'), data.get('cpo'), final_content)
         if config.STORAGE_BACKEND == 'gdrive' and config.GDRIVE_FOLDER_BRIEFING:
-            from modules.gdrive_utils import upload_file
-            upload_file(pdf_path, config.GDRIVE_FOLDER_BRIEFING, "application/pdf")
+            from modules.gdrive_utils import create_file
+            create_file(pdf_path, config.GDRIVE_FOLDER_BRIEFING, "application/pdf")
         else:
             try:
                 import shutil

@@ -6,3 +6,5 @@ cron_log.txt
 *.bak
 *.tmp
 config/gdrive_credentials.json
+config/oauth_client.json
+config/oauth_token.json
