@@ -33,7 +33,11 @@ GDRIVE_FOLDER_TRANSLATE = os.getenv("GDRIVE_FOLDER_TRANSLATE")   # 翻譯
 # Google Drive File IDs（首次上傳後填入 .env）
 GDRIVE_EXCEL_FILE_ID    = os.getenv("GDRIVE_EXCEL_FILE_ID")
 GDRIVE_CMD_FILE_ID      = os.getenv("GDRIVE_CMD_FILE_ID")
-GDRIVE_CONTACT_FILE_ID  = os.getenv("GDRIVE_CONTACT_FILE_ID")
+GDRIVE_CONTACT_FILE_ID   = os.getenv("GDRIVE_CONTACT_FILE_ID")
+GDRIVE_CONTACT_SHEET_GID = os.getenv("GDRIVE_CONTACT_SHEET_GID")
+
+# Telegram
+TELEGRAM_ALLOWED_CHAT_ID = int(os.getenv("TELEGRAM_ALLOWED_CHAT_ID", "0"))
 
 # Fonts
 CHINESE_FONT = '/System/Library/Fonts/STHeiti Light.ttc'

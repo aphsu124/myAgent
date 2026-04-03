@@ -9,7 +9,10 @@ from dotenv import load_dotenv
 
 load_dotenv()
 
-SCOPES = ['https://www.googleapis.com/auth/drive']
+SCOPES = [
+    'https://www.googleapis.com/auth/drive',
+    'https://www.googleapis.com/auth/spreadsheets',
+]
 CREDENTIALS_PATH = os.getenv(
     "GDRIVE_CREDENTIALS_PATH",
     os.path.join(os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__)))), "config/gdrive_credentials.json")
@@ -163,6 +166,138 @@ def write_dataframe_to_excel(df, file_id, apply_style_fn=None):
     except Exception as e:
         print(f"⚠️ Drive 寫入 Excel 失敗 ({file_id}): {e}")
         return False
+
+_sheets_service = None
+
+def _get_sheets_service():
+    """單例：Sheets API 連線"""
+    global _sheets_service
+    if _sheets_service is None:
+        try:
+            creds = Credentials.from_service_account_file(CREDENTIALS_PATH, scopes=SCOPES)
+            _sheets_service = build('sheets', 'v4', credentials=creds)
+        except Exception as e:
+            print(f"⚠️ Google Sheets 連線失敗: {e}")
+            return None
+    return _sheets_service
+
+def _get_sheet_name_by_gid(spreadsheet_id, gid):
+    """由 gid（數字）反查 Sheet 分頁名稱"""
+    try:
+        svc = _get_sheets_service()
+        if not svc: return None
+        meta = svc.spreadsheets().get(spreadsheetId=spreadsheet_id).execute()
+        for s in meta.get('sheets', []):
+            if str(s['properties']['sheetId']) == str(gid):
+                return s['properties']['title']
+    except Exception as e:
+        print(f"⚠️ 無法取得 Sheet 名稱 (gid={gid}): {e}")
+    return None
+
+def read_sheet_to_dataframe(spreadsheet_id, gid=None):
+    """從 Google Sheet 讀取資料為 DataFrame"""
+    try:
+        svc = _get_sheets_service()
+        if not svc: return None
+        sheet_name = _get_sheet_name_by_gid(spreadsheet_id, gid) if gid else None
+        range_name = sheet_name if sheet_name else 'Sheet1'
+        result = svc.spreadsheets().values().get(
+            spreadsheetId=spreadsheet_id, range=range_name
+        ).execute()
+        values = result.get('values', [])
+        if not values: return pd.DataFrame()
+        headers = values[0]
+        rows = [row + [''] * (len(headers) - len(row)) for row in values[1:]]
+        return pd.DataFrame(rows, columns=headers)
+    except Exception as e:
+        print(f"⚠️ Sheets 讀取失敗 ({spreadsheet_id}): {e}")
+        return None
+
+def write_dataframe_to_sheet(df, spreadsheet_id, gid=None):
+    """將 DataFrame 寫回 Google Sheet（覆寫全表）"""
+    try:
+        svc = _get_sheets_service()
+        if not svc: return False
+        sheet_name = _get_sheet_name_by_gid(spreadsheet_id, gid) if gid else None
+        range_name = sheet_name if sheet_name else 'Sheet1'
+        values = [df.columns.tolist()] + df.fillna('').astype(str).values.tolist()
+        svc.spreadsheets().values().clear(
+            spreadsheetId=spreadsheet_id, range=range_name
+        ).execute()
+        svc.spreadsheets().values().update(
+            spreadsheetId=spreadsheet_id,
+            range=f"{range_name}!A1",
+            valueInputOption='RAW',
+            body={'values': values}
+        ).execute()
+        print(f"✅ Sheets 更新成功 ({spreadsheet_id})")
+        return True
+    except Exception as e:
+        print(f"⚠️ Sheets 寫入失敗 ({spreadsheet_id}): {e}")
+        return False
+
+def append_row_to_sheet(row_values, spreadsheet_id, gid=None):
+    """在 Google Sheet 底部附加一行（不動現有資料）。回傳 True/False"""
+    try:
+        svc = _get_sheets_service()
+        if not svc: return False
+        sheet_name = _get_sheet_name_by_gid(spreadsheet_id, gid) if gid else 'Sheet1'
+        range_name = sheet_name or 'Sheet1'
+        svc.spreadsheets().values().append(
+            spreadsheetId=spreadsheet_id,
+            range=f"{range_name}!A1",
+            valueInputOption='RAW',
+            insertDataOption='INSERT_ROWS',
+            body={'values': [row_values]}
+        ).execute()
+        return True
+    except Exception as e:
+        print(f"⚠️ Sheets 附加行失敗 ({spreadsheet_id}): {e}")
+        return False
+
+def update_row_in_sheet(df_row_index, row_values, spreadsheet_id, gid=None):
+    """只更新 Google Sheet 中的特定一行（不動其他資料）。
+    df_row_index 為 DataFrame 的 0-based index（不含標題列）。回傳 True/False"""
+    try:
+        svc = _get_sheets_service()
+        if not svc: return False
+        sheet_name = _get_sheet_name_by_gid(spreadsheet_id, gid) if gid else 'Sheet1'
+        range_name = sheet_name or 'Sheet1'
+        # +1 for header row, +1 because Sheets is 1-indexed
+        sheet_row = df_row_index + 2
+        svc.spreadsheets().values().update(
+            spreadsheetId=spreadsheet_id,
+            range=f"{range_name}!A{sheet_row}",
+            valueInputOption='RAW',
+            body={'values': [row_values]}
+        ).execute()
+        return True
+    except Exception as e:
+        print(f"⚠️ Sheets 更新行失敗 (row={df_row_index}): {e}")
+        return False
+
+def delete_file(file_id):
+    """刪除 Drive 上的檔案（等同於「標記為已處理」）。回傳 True/False"""
+    try:
+        svc = _get_drive_service()
+        if not svc: return False
+        svc.files().delete(fileId=file_id).execute()
+        return True
+    except Exception as e:
+        print(f"⚠️ Drive 刪除失敗 ({file_id}): {e}")
+        return False
+
+def find_file_across_drive(filename):
+    """跨所有 Service Account 有權限的資料夾搜尋檔案名稱。回傳 [{'id', 'name', 'parents'}]"""
+    try:
+        svc = _get_drive_service()
+        if not svc: return []
+        q = f"name='{filename}' and trashed=false"
+        res = svc.files().list(q=q, fields="files(id, name, parents)").execute()
+        return res.get('files', [])
+    except Exception as e:
+        print(f"⚠️ Drive 全域搜尋失敗 ({filename}): {e}")
+        return []
 
 def list_files_in_folder(folder_id, extensions=None):
     """列出資料夾中的檔案，回傳 [{'id': ..., 'name': ...}]"""

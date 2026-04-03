@@ -74,6 +74,10 @@ def main():
         
         try:
             resp = client.models.generate_content(model="gemini-2.5-flash", contents=prompt, config={"max_output_tokens": 4096})
+            try:
+                from modules.token_tracker import record as _tt
+                _tt('google', 'gemini-2.5-flash', resp.usage_metadata.prompt_token_count or 0, resp.usage_metadata.candidates_token_count or 0)
+            except Exception: pass
             if resp.text:
                 raw_text = resp.text
                 with open(os.path.join(config.BASE_DIR, "data/DEBUG_RAW.txt"), "w") as f: f.write(raw_text)

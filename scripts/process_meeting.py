@@ -15,12 +15,9 @@ from dotenv import load_dotenv
 load_dotenv()
 GEMINI_API_KEY = os.getenv("GEMINI_API_KEY")
 OPENAI_API_KEY = os.getenv("OPENAI_API_KEY")
+from modules.config import STORAGE_BACKEND, GDRIVE_FOLDER_MEETING
+
 ICLOUD_BASE = "/Users/bucksteam/Library/Mobile Documents/com~apple~CloudDocs/泰國/工作/甲米油廠/會議"
-RECORD_DIR = os.path.join(ICLOUD_BASE, "錄音")
-SUMMARY_DIR = os.path.join(ICLOUD_BASE, "摘要")
-TRANSCRIPT_DIR = os.path.join(ICLOUD_BASE, "逐字稿")
-VOCAB_DIR = os.path.join(ICLOUD_BASE, "泰文學習")
-PROCESSED_DIR = os.path.join(RECORD_DIR, "processed")
 VOCAB_DB = "data/thai_vocab.json"
 
 # 字體設定
@@ -36,14 +33,28 @@ def transcribe_audio(file_path):
     try:
         with open(file_path, "rb") as audio:
             transcript = client_openai.audio.transcriptions.create(
-                model="whisper-1", 
+                model="whisper-1",
                 file=audio,
-                language="th" 
+                language="th"
             )
             return transcript.text
     except Exception as e:
         print(f"❌ 轉錄失敗: {e}")
         return None
+
+def _save_text(content, filename):
+    """依照 STORAGE_BACKEND 儲存文字檔（Drive 或本機）"""
+    if STORAGE_BACKEND == 'gdrive' and GDRIVE_FOLDER_MEETING:
+        from modules.gdrive_utils import upload_bytes
+        upload_bytes(content.encode('utf-8'), filename, GDRIVE_FOLDER_MEETING, "text/plain")
+        print(f"⬆️  已上傳至 Drive：{filename}")
+    else:
+        summary_dir = os.path.join(ICLOUD_BASE, "摘要")
+        os.makedirs(summary_dir, exist_ok=True)
+        path = os.path.join(summary_dir, filename)
+        with open(path, "w", encoding="utf-8") as f:
+            f.write(content)
+        print(f"📄 已儲存至本機：{path}")
 
 def generate_simple_summary(thai_text, filename):
     """針對個人用途檔案：僅做內容摘要"""
@@ -51,10 +62,11 @@ def generate_simple_summary(thai_text, filename):
     prompt = f"請將以下泰文內容翻譯並摘要為繁體中文重點：\n\n{thai_text}"
     try:
         resp = client_gemini.models.generate_content(model="gemini-2.5-flash", contents=prompt)
-        summary_path = os.path.join(SUMMARY_DIR, f"{filename}_內容摘要.txt")
-        with open(summary_path, "w", encoding="utf-8") as f:
-            f.write(resp.text)
-        print(f"✅ 摘要已存至: {summary_path}")
+        try:
+            from modules.token_tracker import record as _tt
+            _tt('google', 'gemini-2.5-flash', resp.usage_metadata.prompt_token_count or 0, resp.usage_metadata.candidates_token_count or 0)
+        except Exception: pass
+        _save_text(resp.text, f"{filename}_內容摘要.txt")
     except Exception as e:
         print(f"AI 摘要失敗: {e}")
 
@@ -71,11 +83,13 @@ def generate_business_report(thai_text, filename):
     """
     try:
         resp = client_gemini.models.generate_content(model="gemini-2.5-flash", contents=prompt)
+        try:
+            from modules.token_tracker import record as _tt
+            _tt('google', 'gemini-2.5-flash', resp.usage_metadata.prompt_token_count or 0, resp.usage_metadata.candidates_token_count or 0)
+        except Exception: pass
         content = resp.text
-        summary_path = os.path.join(SUMMARY_DIR, f"{filename}_會議摘要.txt")
-        with open(summary_path, "w", encoding="utf-8") as f:
-            f.write(content)
-        
+        _save_text(content, f"{filename}_會議摘要.txt")
+
         match = re.search(r'DATA_JSON: ({.*?})', content, re.DOTALL)
         if match:
             new_vocab = json.loads(match.group(1)).get("vocab", {})
@@ -99,7 +113,8 @@ def generate_vocab_pdf_final():
     if not os.path.exists(VOCAB_DB): return
     with open(VOCAB_DB, 'r', encoding='utf-8') as f:
         vocab_data = json.load(f)
-    pdf_path = os.path.join(VOCAB_DIR, "泰國商務單字本_最新版.pdf")
+    pdf_filename = "泰國商務單字本_最新版.pdf"
+    pdf_path = f"/tmp/{pdf_filename}"
     sorted_vocab = sorted(vocab_data.items(), key=lambda x: x[1]['count'], reverse=True)[:50]
     fig, ax = plt.subplots(figsize=(10, 14)); ax.axis('off')
     plt.text(0.5, 0.98, "🗂️ 泰國甲米油廠 - 商務泰文單字本", fontproperties=MY_FONT, fontsize=20, ha='center', color='#2E7D32')
@@ -114,33 +129,68 @@ def generate_vocab_pdf_final():
         if y < 0.05: break
     plt.savefig(pdf_path, dpi=300, bbox_inches='tight'); plt.close()
 
+    if STORAGE_BACKEND == 'gdrive' and GDRIVE_FOLDER_MEETING:
+        from modules.gdrive_utils import upload_file
+        upload_file(pdf_path, GDRIVE_FOLDER_MEETING, "application/pdf")
+        print(f"📚 單字本 PDF 已上傳至 Drive")
+    else:
+        vocab_dir = os.path.join(ICLOUD_BASE, "泰文學習")
+        os.makedirs(vocab_dir, exist_ok=True)
+        shutil.copy(pdf_path, os.path.join(vocab_dir, pdf_filename))
+        print(f"📚 單字本 PDF 已存至本機")
+
 def main():
-    if not os.path.exists(PROCESSED_DIR): os.makedirs(PROCESSED_DIR)
-    if not os.path.exists(TRANSCRIPT_DIR): os.makedirs(TRANSCRIPT_DIR)
-    
-    audio_files = [f for f in os.listdir(RECORD_DIR) if f.lower().endswith(('.mp3', '.m4a', '.wav'))]
-    if not audio_files:
-        print("📭 錄音資料夾目前沒有新檔案。")
-        return
+    if STORAGE_BACKEND == 'gdrive' and GDRIVE_FOLDER_MEETING:
+        from modules.gdrive_utils import list_files_in_folder, download_file, upload_bytes, delete_file
+        audio_exts = ('.mp3', '.m4a', '.wav')
+        files = list_files_in_folder(GDRIVE_FOLDER_MEETING)
+        audio_files = [f for f in files if any(f['name'].lower().endswith(ext) for ext in audio_exts)]
+        if not audio_files:
+            print("📭 Drive 會議資料夾目前沒有新音檔。")
+            return
+        for f in audio_files:
+            tmp_path = f"/tmp/{f['name']}"
+            if download_file(f['id'], tmp_path):
+                text = transcribe_audio(tmp_path)
+                if text:
+                    # 上傳逐字稿
+                    upload_bytes(text.encode('utf-8'), f"{f['name']}_逐字稿.txt", GDRIVE_FOLDER_MEETING, "text/plain")
+                    print(f"📄 逐字稿已上傳至 Drive")
+                    if "品川" in f['name']:
+                        generate_simple_summary(text, f['name'])
+                    else:
+                        generate_business_report(text, f['name'])
+                    # 刪除來源音檔
+                    delete_file(f['id'])
+                    print(f"✅ 檔案 {f['name']} 已完成智慧處理並從 Drive 刪除。")
+                try: os.remove(tmp_path)
+                except: pass
+    else:
+        record_dir = os.path.join(ICLOUD_BASE, "錄音")
+        transcript_dir = os.path.join(ICLOUD_BASE, "逐字稿")
+        processed_dir = os.path.join(record_dir, "processed")
+        os.makedirs(processed_dir, exist_ok=True)
+        os.makedirs(transcript_dir, exist_ok=True)
 
-    for file in audio_files:
-        full_path = os.path.join(RECORD_DIR, file)
-        text = transcribe_audio(full_path)
-        if text:
-            # 1. 儲存原始泰文逐字稿 (所有模式通用)
-            transcript_path = os.path.join(TRANSCRIPT_DIR, f"{file}_逐字稿.txt")
-            with open(transcript_path, "w", encoding="utf-8") as f:
-                f.write(text)
-            print(f"📄 原始泰文逐字稿已存至: {transcript_path}")
+        audio_files = [f for f in os.listdir(record_dir) if f.lower().endswith(('.mp3', '.m4a', '.wav'))]
+        if not audio_files:
+            print("📭 錄音資料夾目前沒有新檔案。")
+            return
 
-            # 2. 判斷邏輯
-            if "品川" in file:
-                generate_simple_summary(text, file)
-            else:
-                generate_business_report(text, file)
-            
-            shutil.move(full_path, os.path.join(PROCESSED_DIR, file))
-            print(f"✅ 檔案 {file} 已完成智慧處理並歸檔。")
+        for file in audio_files:
+            full_path = os.path.join(record_dir, file)
+            text = transcribe_audio(full_path)
+            if text:
+                transcript_path = os.path.join(transcript_dir, f"{file}_逐字稿.txt")
+                with open(transcript_path, "w", encoding="utf-8") as f:
+                    f.write(text)
+                print(f"📄 原始泰文逐字稿已存至: {transcript_path}")
+                if "品川" in file:
+                    generate_simple_summary(text, file)
+                else:
+                    generate_business_report(text, file)
+                shutil.move(full_path, os.path.join(processed_dir, file))
+                print(f"✅ 檔案 {file} 已完成智慧處理並歸檔。")
 
 if __name__ == "__main__":
     main()

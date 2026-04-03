@@ -8,8 +8,9 @@ from dotenv import load_dotenv
 
 load_dotenv()
 GEMINI_API_KEY = os.getenv("GEMINI_API_KEY")
-ICLOUD_IMG_DIR = "/Users/bucksteam/Library/Mobile Documents/com~apple~CloudDocs/泰國/工作/甲米油廠/監控/截圖"
 LOCAL_IMG_DIR = "data/snapshots"
+
+from modules.config import STORAGE_BACKEND, GDRIVE_FOLDER_MONITOR
 
 # 初始化 Gemini
 client = genai.Client(api_key=GEMINI_API_KEY, http_options={'api_version': 'v1'})
@@ -36,19 +37,23 @@ def capture_frame(camera_url):
         timestamp = datetime.datetime.now().strftime("%Y%m%d_%H%M%S")
         filename = f"snapshot_{timestamp}.jpg"
         
-        # 本地與 iCloud 雙備份
+        # 本地備份
         local_path = os.path.join(LOCAL_IMG_DIR, filename)
         cv2.imwrite(local_path, frame)
-        
+
         try:
-            if os.path.exists(ICLOUD_IMG_DIR):
-                icloud_path = os.path.join(ICLOUD_IMG_DIR, filename)
-                cv2.imwrite(icloud_path, frame)
-                print(f"📸 截圖成功！已存至 iCloud 與本地。")
-                return local_path
-        except:
-            print("⚠️ iCloud 寫入失敗，僅保留本地。")
-            return local_path
+            if STORAGE_BACKEND == 'gdrive' and GDRIVE_FOLDER_MONITOR:
+                from modules.gdrive_utils import upload_file
+                upload_file(local_path, GDRIVE_FOLDER_MONITOR, "image/jpeg")
+                print(f"📸 截圖成功！已上傳至 Google Drive 與本地。")
+            else:
+                icloud_dir = "/Users/bucksteam/Library/Mobile Documents/com~apple~CloudDocs/泰國/工作/甲米油廠/監控/截圖"
+                if os.path.exists(icloud_dir):
+                    cv2.imwrite(os.path.join(icloud_dir, filename), frame)
+                    print(f"📸 截圖成功！已存至 iCloud 與本地。")
+        except Exception as e:
+            print(f"⚠️ 備份失敗，僅保留本地: {e}")
+        return local_path
     return None
 
 def analyze_image(image_path):
@@ -58,6 +63,10 @@ def analyze_image(image_path):
     
     try:
         resp = client.models.generate_content(model="gemini-2.5-flash", contents=[prompt, img])
+        try:
+            from modules.token_tracker import record as _tt
+            _tt('google', 'gemini-2.5-flash', resp.usage_metadata.prompt_token_count or 0, resp.usage_metadata.candidates_token_count or 0)
+        except Exception: pass
         print(f"✅ AI 分析結果：\n{resp.text}")
         return resp.text
     except Exception as e:

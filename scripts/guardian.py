@@ -72,6 +72,10 @@ def _diagnose_and_alert(task, error):
     prompt = f"任務 {task} 失敗了。錯誤日誌如下：\n{error}\n請簡短分析原因並提供 1 句修正建議。"
     try:
         resp = client.models.generate_content(model="gemini-2.0-flash", contents=prompt)
+        try:
+            from modules.token_tracker import record as _tt
+            _tt('google', 'gemini-2.0-flash', resp.usage_metadata.prompt_token_count or 0, resp.usage_metadata.candidates_token_count or 0)
+        except Exception: pass
         analysis = resp.text if resp.text else "無法分析"
         print(f"🤖 AI 診斷建議: {analysis}")
     except Exception as e:

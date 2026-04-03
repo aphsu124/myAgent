@@ -1,0 +1,213 @@
+<!DOCTYPE html>
+<html lang="zh-Hant">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Jarvis Monitor</title>
+<style>
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body {
+    font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+    background: #0d1117;
+    color: #e6edf3;
+    min-height: 100vh;
+    padding: 24px;
+  }
+  h1 {
+    font-size: 20px;
+    font-weight: 600;
+    margin-bottom: 24px;
+    color: #58a6ff;
+    letter-spacing: 0.5px;
+  }
+  h1 span { color: #8b949e; font-size: 14px; font-weight: 400; margin-left: 8px; }
+  .grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+    gap: 16px;
+    margin-bottom: 24px;
+  }
+  .card {
+    background: #161b22;
+    border: 1px solid #30363d;
+    border-radius: 12px;
+    padding: 20px;
+  }
+  .card-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 16px;
+  }
+  .card-title { font-size: 15px; font-weight: 600; }
+  .badge {
+    font-size: 11px;
+    padding: 2px 8px;
+    border-radius: 20px;
+    font-weight: 500;
+  }
+  .badge-free  { background: #1f4e2a; color: #3fb950; }
+  .badge-paid  { background: #3d2a1e; color: #f0883e; }
+  .stat-row {
+    display: flex;
+    justify-content: space-between;
+    font-size: 13px;
+    color: #8b949e;
+    margin-bottom: 6px;
+  }
+  .stat-row span:last-child { color: #e6edf3; font-weight: 500; }
+  .progress-wrap { margin: 14px 0 6px; }
+  .progress-label {
+    display: flex;
+    justify-content: space-between;
+    font-size: 12px;
+    color: #8b949e;
+    margin-bottom: 6px;
+  }
+  .progress-bar-bg {
+    background: #21262d;
+    border-radius: 4px;
+    height: 8px;
+    overflow: hidden;
+  }
+  .progress-bar {
+    height: 100%;
+    border-radius: 4px;
+    transition: width 0.4s ease;
+  }
+  .bar-green  { background: #238636; }
+  .bar-yellow { background: #9e6a03; }
+  .bar-red    { background: #b62324; }
+
+  .total-card {
+    background: #161b22;
+    border: 1px solid #30363d;
+    border-radius: 12px;
+    padding: 20px 24px;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+  }
+  .total-label { font-size: 14px; color: #8b949e; }
+  .total-amount { font-size: 28px; font-weight: 700; color: #58a6ff; }
+  .total-sub { font-size: 12px; color: #6e7681; margin-top: 2px; }
+
+  .updated { text-align: center; font-size: 12px; color: #6e7681; margin-top: 16px; }
+
+  .section-title {
+    font-size: 12px;
+    color: #6e7681;
+    text-transform: uppercase;
+    letter-spacing: 0.8px;
+    margin-bottom: 12px;
+  }
+</style>
+</head>
+<body>
+
+<h1>🤖 Jarvis Monitor <span id="updated-time"></span></h1>
+
+<p class="section-title">今日用量</p>
+<div class="grid" id="today-grid">
+  <div class="card"><p style="color:#6e7681">載入中...</p></div>
+</div>
+
+<div class="total-card">
+  <div>
+    <div class="total-label">本月累計費用</div>
+    <div class="total-sub" id="month-label"></div>
+  </div>
+  <div>
+    <div class="total-amount" id="month-total">$0.0000</div>
+  </div>
+</div>
+
+<p class="updated" id="refresh-hint">每 30 秒自動刷新</p>
+
+<script>
+const PROVIDER_EMOJI = {
+  google:    '🔵',
+  anthropic: '🟣',
+  openai:    '🟢',
+};
+
+function barClass(pct) {
+  if (pct === null) return 'bar-green';
+  if (pct >= 90) return 'bar-red';
+  if (pct >= 70) return 'bar-yellow';
+  return 'bar-green';
+}
+
+function fmtCost(v) {
+  return v === 0 ? '$0.00' : '$' + v.toFixed(4);
+}
+
+function fmtTokens(n) {
+  if (n >= 1_000_000) return (n/1_000_000).toFixed(2) + 'M';
+  if (n >= 1_000)     return (n/1_000).toFixed(1) + 'K';
+  return String(n);
+}
+
+function renderCards(items, containerId) {
+  const grid = document.getElementById(containerId);
+  if (!items || items.length === 0) {
+    grid.innerHTML = '<div class="card"><p style="color:#6e7681;font-size:13px">尚無資料，等待第一次 API 呼叫...</p></div>';
+    return;
+  }
+  grid.innerHTML = items.map(d => {
+    const emoji = PROVIDER_EMOJI[d.provider] || '⚪';
+    const pct   = d.usage_percent;
+    const barW  = pct !== null ? Math.min(pct, 100) : 0;
+    const cls   = barClass(pct);
+    const freeTag = d.has_free_tier
+      ? '<span class="badge badge-free">免費額度</span>'
+      : '<span class="badge badge-paid">計費</span>';
+
+    const progressHtml = d.has_free_tier ? `
+      <div class="progress-wrap">
+        <div class="progress-label">
+          <span>今日免費額度</span>
+          <span>${pct !== null ? pct.toFixed(1) + '%' : 'N/A'}</span>
+        </div>
+        <div class="progress-bar-bg">
+          <div class="progress-bar ${cls}" style="width:${barW}%"></div>
+        </div>
+      </div>` : '';
+
+    return `
+    <div class="card">
+      <div class="card-header">
+        <span class="card-title">${emoji} ${d.model}</span>
+        ${freeTag}
+      </div>
+      <div class="stat-row"><span>今日 Input</span><span>${fmtTokens(d.input_tokens)}</span></div>
+      <div class="stat-row"><span>今日 Output</span><span>${fmtTokens(d.output_tokens)}</span></div>
+      <div class="stat-row"><span>今日費用</span><span>${fmtCost(d.cost_usd)}</span></div>
+      ${progressHtml}
+    </div>`;
+  }).join('');
+}
+
+async function refresh() {
+  try {
+    const res  = await fetch('/api/usage');
+    const data = await res.json();
+
+    renderCards(data.today, 'today-grid');
+
+    document.getElementById('month-total').textContent = '$' + data.month_total.toFixed(4);
+    document.getElementById('month-label').textContent = data.month_name + '累計（每月1日重置）';
+
+    const now = new Date();
+    document.getElementById('updated-time').textContent =
+      '更新於 ' + now.getHours().toString().padStart(2,'0') + ':' + now.getMinutes().toString().padStart(2,'0') + ':' + now.getSeconds().toString().padStart(2,'0');
+  } catch(e) {
+    document.getElementById('refresh-hint').textContent = '⚠️ 無法連線至後端';
+  }
+}
+
+refresh();
+setInterval(refresh, 30000);
+</script>
+</body>
+</html>
