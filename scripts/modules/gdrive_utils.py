@@ -34,7 +34,9 @@ def _get_user_drive_service():
     try:
         from google.oauth2.credentials import Credentials as UserCredentials
         from google.auth.transport.requests import Request
-        creds = UserCredentials.from_authorized_user_file(OAUTH_TOKEN_PATH, SCOPES)
+        # 僅用 drive scope（token 授權時只申請此 scope）
+        _DRIVE_SCOPE = ['https://www.googleapis.com/auth/drive']
+        creds = UserCredentials.from_authorized_user_file(OAUTH_TOKEN_PATH, _DRIVE_SCOPE)
         if creds.expired and creds.refresh_token:
             creds.refresh(Request())
             with open(OAUTH_TOKEN_PATH, 'w') as f:
