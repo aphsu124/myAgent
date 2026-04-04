@@ -73,7 +73,11 @@ class JarvisMonitor(rumps.App):
             for prov in provider_order:
                 d = summary_map.get(prov)
                 if not d:
-                    continue
+                    d = {
+                        'cost_usd':      0,
+                        'usage_percent': 0 if prov == 'google' else None,
+                        'has_free_tier': prov == 'google',
+                    }
                 short        = PROVIDER_SHORT.get(prov, prov[0].upper())
                 month_cost   = month_cost_by_provider.get(prov, 0)
                 pct          = d['usage_percent']

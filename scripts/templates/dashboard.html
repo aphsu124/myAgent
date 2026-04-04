@@ -148,13 +148,29 @@ function fmtTokens(n) {
   return String(n);
 }
 
+const KNOWN_PROVIDERS = [
+  { provider: 'google',    label: 'Gemini',  has_free_tier: true },
+  { provider: 'anthropic', label: 'Claude',  has_free_tier: false },
+  { provider: 'openai',    label: 'OpenAI',  has_free_tier: false },
+];
+
 function renderCards(items, containerId) {
   const grid = document.getElementById(containerId);
-  if (!items || items.length === 0) {
+  const presentProviders = new Set((items || []).map(d => d.provider));
+  const placeholders = KNOWN_PROVIDERS
+    .filter(p => !presentProviders.has(p.provider))
+    .map(p => ({
+      model: p.label, provider: p.provider,
+      input_tokens: 0, output_tokens: 0, cost_usd: 0,
+      usage_percent: p.has_free_tier ? 0 : null,
+      has_free_tier: p.has_free_tier,
+    }));
+  const allItems = [...(items || []), ...placeholders];
+  if (allItems.length === 0) {
     grid.innerHTML = '<div class="card"><p style="color:#6e7681;font-size:13px">尚無資料，等待第一次 API 呼叫...</p></div>';
     return;
   }
-  grid.innerHTML = items.map(d => {
+  grid.innerHTML = allItems.map(d => {
     const emoji = PROVIDER_EMOJI[d.provider] || '⚪';
     const pct   = d.usage_percent;
     const barW  = pct !== null ? Math.min(pct, 100) : 0;

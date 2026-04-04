@@ -54,6 +54,63 @@ def send_document(chat_id, file_path):
     except Exception as e:
         print(f"⚠️ 檔案發送失敗: {e}")
 
+def handle_document(doc, chat_id):
+    """接收 PDF 文件，用 Gemini Vision 辨識內容並回傳分析"""
+    mime_type = doc.get("mime_type", "")
+    file_name = doc.get("file_name", "document")
+    if mime_type != "application/pdf":
+        send_msg(chat_id, f"⚠️ 目前只支援 PDF 格式（收到：{mime_type}）")
+        return
+
+    send_msg(chat_id, f"📄 收到 {file_name}，辨識中...")
+    print(f"📩 收到文件：{file_name} ({mime_type})")
+
+    try:
+        import fitz
+        import tempfile
+
+        # 下載 PDF
+        file_id = doc["file_id"]
+        r = requests.get(f"https://api.telegram.org/bot{TOKEN}/getFile",
+                         params={"file_id": file_id}, timeout=15)
+        file_path = r.json()["result"]["file_path"]
+        pdf_bytes = requests.get(
+            f"https://api.telegram.org/file/bot{TOKEN}/{file_path}", timeout=60
+        ).content
+
+        # PDF → 圖片（最多前 5 頁）
+        pdf_doc = fitz.open(stream=pdf_bytes, filetype="pdf")
+        image_parts = []
+        for i in range(min(5, len(pdf_doc))):
+            page = pdf_doc[i]
+            pix = page.get_pixmap(dpi=150)
+            image_parts.append(
+                types.Part.from_bytes(data=pix.tobytes("png"), mime_type="image/png")
+            )
+        pdf_doc.close()
+
+        prompt = (
+            "這是一份掃描文件的圖片。請用繁體中文完成以下三項：\n"
+            "1. 【文件種類】：這是什麼類型的文件？用途是什麼？\n"
+            "2. 【內容翻譯】：將文件主要內容翻譯成繁體中文（若已是中文則整理條列）\n"
+            "3. 【內容摘要】：用 3-5 點條列出關鍵重點\n\n"
+            "請依序回答，結構清晰。"
+        )
+
+        response = client.models.generate_content(
+            model="gemini-2.5-flash",
+            contents=[prompt] + image_parts,
+        )
+        answer = response.text
+        # Telegram 單則訊息上限 4096 字
+        for i in range(0, len(answer), 4000):
+            send_msg(chat_id, answer[i:i+4000])
+
+    except Exception as e:
+        print(f"❌ handle_document 失敗: {e}")
+        send_msg(chat_id, f"⚠️ 文件辨識失敗：{str(e)[:150]}")
+
+
 def handle_message(text, chat_id):
     """將訊息送給 Gemini Function Calling，執行對應工具或直接回答"""
     try:
@@ -130,15 +187,32 @@ def main():
                         save_offset(offset)
 
                         msg = update.get("message", {})
-                        text = msg.get("text", "").strip()
                         chat_id = msg.get("chat", {}).get("id")
-
-                        if not text or not chat_id:
+                        if not chat_id:
                             continue
 
                         # ── 身份驗證：只接受授權用戶 ──
                         if TELEGRAM_ALLOWED_CHAT_ID and chat_id != TELEGRAM_ALLOWED_CHAT_ID:
                             print(f"🚫 拒絕未授權訊息 (chat_id={chat_id})")
+                            continue
+
+                        # ── 文件訊息 ──
+                        if msg.get("document"):
+                            handle_document(msg["document"], chat_id)
+                            continue
+
+                        # ── 文字訊息 ──
+                        text = msg.get("text", "").strip()
+                        if not text:
+                            # 判斷是哪種不支援的類型
+                            if msg.get("photo"):
+                                send_msg(chat_id, "⚠️ 目前不支援圖片，請傳 PDF 文件。")
+                            elif msg.get("voice") or msg.get("audio"):
+                                send_msg(chat_id, "⚠️ 目前不支援語音/音訊。")
+                            elif msg.get("sticker"):
+                                send_msg(chat_id, "⚠️ 收到貼圖，但我不懂這個語言 😅")
+                            elif msg:
+                                send_msg(chat_id, "⚠️ 收到未支援的訊息格式，請傳文字或 PDF 文件。")
                             continue
 
                         print(f"📩 收到：{text}")
