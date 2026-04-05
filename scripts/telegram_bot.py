@@ -1,13 +1,39 @@
 import os
+import sys
+import json
 import requests
 import time
 import random
+import atexit
 from dotenv import load_dotenv
 
 load_dotenv()
 TOKEN = os.getenv("TELEGRAM_BOT_TOKEN")
 BASE_DIR = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+
+ICLOUD_BRIEFING = "/Users/bucksteam/Library/Mobile Documents/com~apple~CloudDocs/泰國/工作/甲米油廠/簡報"
+TASKS_PATH = os.path.expanduser("~/.claude/projects/-Users-bucksteam-myAgent/memory/tasks.md")
+AUTODREAM_STATE = os.path.expanduser("~/.claude/autodream/state.json")
+AUTODREAM_REPORT = os.path.expanduser("~/.claude/autodream/last_report.md")
 OFFSET_FILE = os.path.join(BASE_DIR, "data/tg_offset.txt")
+PID_FILE = os.path.join(BASE_DIR, "data/telegram_bot.pid")
+
+
+def acquire_lock():
+    """確保只有一個 instance 在執行，否則立即退出"""
+    if os.path.exists(PID_FILE):
+        try:
+            with open(PID_FILE) as f:
+                old_pid = int(f.read().strip())
+            # 確認 PID 是否仍在執行
+            os.kill(old_pid, 0)
+            print(f"⛔ 已有 instance 在執行 (PID {old_pid})，退出。")
+            sys.exit(1)
+        except (ProcessLookupError, ValueError):
+            pass  # 舊 PID 已不存在，繼續
+    with open(PID_FILE, "w") as f:
+        f.write(str(os.getpid()))
+    atexit.register(lambda: os.path.exists(PID_FILE) and os.remove(PID_FILE))
 
 from modules.config import TELEGRAM_ALLOWED_CHAT_ID, GEMINI_API_KEY
 from google import genai
@@ -53,6 +79,90 @@ def send_document(chat_id, file_path):
             )
     except Exception as e:
         print(f"⚠️ 檔案發送失敗: {e}")
+
+def handle_command(text, chat_id):
+    """處理斜線指令，回傳 True 表示已處理"""
+    cmd = text.split()[0].lower()
+
+    if cmd == "/ping":
+        send_msg(chat_id, "🏓 Pong! 我還活著。")
+
+    elif cmd == "/report":
+        send_msg(chat_id, "📊 收到指令，正在產出日報...")
+        result = dispatch("run_daily_report", {})
+        send_msg(chat_id, str(result))
+
+    elif cmd == "/excel":
+        excel_path = os.path.join(ICLOUD_BRIEFING, "palm_oil_history.xlsx")
+        if os.path.exists(excel_path):
+            send_document(chat_id, excel_path)
+        else:
+            send_msg(chat_id, "❌ 找不到 Excel 檔案，請確認 iCloud 路徑。")
+
+    elif cmd == "/dream_status":
+        try:
+            with open(AUTODREAM_STATE, "r") as f:
+                s = json.load(f)
+            msg = (
+                f"🌙 *autoDream 狀態*\n\n"
+                f"夢境次數：{s.get('dream_count', 0)} 次\n"
+                f"上次整合：{s.get('last_dream_time', 'N/A')[:10]}\n"
+                f"累積對話：{s.get('conversation_count', 0)} 次\n"
+                f"下次觸發需：{max(0, 5 - s.get('conversation_count', 0))} 次對話"
+            )
+        except Exception:
+            msg = "❌ 無法讀取狀態檔案"
+        try:
+            requests.post(
+                f"https://api.telegram.org/bot{TOKEN}/sendMessage",
+                data={"chat_id": chat_id, "text": msg, "parse_mode": "Markdown"},
+                headers={"Connection": "close"}, timeout=15
+            )
+        except Exception as e:
+            print(f"⚠️ 訊息發送失敗: {e}")
+
+    elif cmd == "/dream_tasks":
+        try:
+            with open(TASKS_PATH, "r", encoding="utf-8") as f:
+                content = f.read()
+            parts = content.split("---", 2)
+            body = parts[2].strip() if len(parts) >= 3 else content
+            msg = f"📋 *任務紀錄*\n\n```\n{body[:3000]}\n```"
+        except Exception:
+            msg = "❌ 無法讀取任務檔案"
+        try:
+            requests.post(
+                f"https://api.telegram.org/bot{TOKEN}/sendMessage",
+                data={"chat_id": chat_id, "text": msg, "parse_mode": "Markdown"},
+                headers={"Connection": "close"}, timeout=15
+            )
+        except Exception as e:
+            print(f"⚠️ 訊息發送失敗: {e}")
+
+    elif cmd == "/dream_report":
+        try:
+            with open(AUTODREAM_REPORT, "r", encoding="utf-8") as f:
+                content = f.read()
+            msg = f"📄 *最近一次夢境報告*\n\n{content[:3500]}"
+        except FileNotFoundError:
+            msg = "📄 尚無夢境報告（autoDream 尚未執行過）"
+        except Exception:
+            msg = "❌ 無法讀取報告檔案"
+        try:
+            requests.post(
+                f"https://api.telegram.org/bot{TOKEN}/sendMessage",
+                data={"chat_id": chat_id, "text": msg, "parse_mode": "Markdown"},
+                headers={"Connection": "close"}, timeout=15
+            )
+        except Exception as e:
+            print(f"⚠️ 訊息發送失敗: {e}")
+
+    else:
+        cmds = "/ping /report /excel /dream_status /dream_tasks /dream_report"
+        send_msg(chat_id, f"❓ 未知指令：{cmd}\n可用指令：{cmds}")
+
+    return True
+
 
 def handle_document(doc, chat_id):
     """接收 PDF 文件，用 Gemini Vision 辨識內容並回傳分析"""
@@ -133,12 +243,13 @@ def handle_message(text, chat_id):
         if fc_part:
             fc = fc_part.function_call
             tool_names_zh = {
-                'convert_to_pdf':   'Excel → PDF 轉換',
-                'run_daily_report': '產出日報',
-                'list_drive_files': '列出 Drive 檔案',
-                'capture_camera':   '拍攝截圖',
-                'get_status':       '查詢系統狀態',
-                'get_token_usage':  '查詢 Token 用量',
+                'convert_to_pdf':       'Excel → PDF 轉換',
+                'run_daily_report':     '產出日報',
+                'list_drive_files':     '列出 Drive 檔案',
+                'capture_camera':       '拍攝截圖',
+                'get_status':           '查詢系統狀態',
+                'get_token_usage':      '查詢 Token 用量',
+                'search_breaking_news': '即時新聞掃描',
             }
             send_msg(chat_id, f"⚙️ 執行中：{tool_names_zh.get(fc.name, fc.name)}...")
             print(f"📩 Function Call: {fc.name}({dict(fc.args)})")
@@ -163,6 +274,7 @@ def handle_message(text, chat_id):
         send_msg(chat_id, f"⚠️ Jarvis 發生錯誤：{str(e)[:100]}")
 
 def main():
+    acquire_lock()
     print("🕵️ Jarvis 特種連線監聽器已啟動...")
     print(f"🔐 授權 chat_id：{TELEGRAM_ALLOWED_CHAT_ID}")
     offset = get_offset()
@@ -216,6 +328,9 @@ def main():
                             continue
 
                         print(f"📩 收到：{text}")
+                        if text.startswith("/"):
+                            handle_command(text, chat_id)
+                            continue
                         handle_message(text, chat_id)
 
             time.sleep(1)

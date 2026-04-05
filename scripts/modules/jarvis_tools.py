@@ -177,6 +177,16 @@ def get_token_usage():
     lines.append(f"\n💰 {month_name}累計總費用：${month_total:.4f}")
     return "\n".join(lines)
 
+def search_breaking_news(force=False):
+    """搜尋即時重要棕櫚油訊息，有重大事件才推播至 Telegram"""
+    import sys
+    sys.path.insert(0, BASE_DIR + '/scripts')
+    try:
+        from breaking_news import check_and_push
+        return check_and_push(force=bool(force))
+    except Exception as e:
+        return f"❌ 即時新聞掃描失敗：{e}"
+
 def get_status():
     """回報 Jarvis 系統狀態"""
     now = datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S")
@@ -196,12 +206,13 @@ def get_status():
 
 # ── 工具分發器 ──────────────────────────────────────────────────
 TOOL_REGISTRY = {
-    'convert_to_pdf':   convert_to_pdf,
-    'run_daily_report': run_daily_report,
-    'list_drive_files': list_drive_files,
-    'capture_camera':   capture_camera,
-    'get_status':       get_status,
-    'get_token_usage':  get_token_usage,
+    'convert_to_pdf':        convert_to_pdf,
+    'run_daily_report':      run_daily_report,
+    'list_drive_files':      list_drive_files,
+    'capture_camera':        capture_camera,
+    'get_status':            get_status,
+    'get_token_usage':       get_token_usage,
+    'search_breaking_news':  search_breaking_news,
 }
 
 def dispatch(tool_name, args):
@@ -268,6 +279,23 @@ TOOL_DECLARATIONS = types.Tool(
         types.FunctionDeclaration(
             name='get_token_usage',
             description='回報今日三家 AI（Gemini、Claude、OpenAI）的 token 用量、費用與本月累計總費用',
+        ),
+        types.FunctionDeclaration(
+            name='search_breaking_news',
+            description=(
+                '立即搜尋最新棕櫚油重大事件（禁令、暴跌、政策變動等），'
+                '若有重要消息則推播至 Telegram。'
+                '靜音模式：沒有重要事件時不發送任何訊息。'
+            ),
+            parameters=types.Schema(
+                type='OBJECT',
+                properties={
+                    'force': types.Schema(
+                        type='BOOLEAN',
+                        description='true = 強制推播（跳過重要性門檻，適合手動查看最新消息）；false = 僅推播重要事件（預設）'
+                    ),
+                }
+            )
         ),
     ]
 )

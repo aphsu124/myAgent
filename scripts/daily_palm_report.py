@@ -13,12 +13,18 @@ import argparse
 def get_palm_news(date_str):
     url = "https://google.serper.dev/search"
     res = ""
+    source_num = 0
     queries = [f"Thailand palm oil FFB CPO market news {date_str}", f"BMD palm oil futures analysis {date_str}"]
     for q in queries:
         try:
             r = requests.post(url, headers={'X-API-KEY': config.SERPER_API_KEY}, json={"q": q, "gl": "th", "hl": "en", "tbs": "qdr:m"}, timeout=15)
             if r.status_code == 200:
-                for o in r.json().get('organic', []): res += f"\n{o.get('snippet')}\n"
+                for o in r.json().get('organic', []):
+                    source_num += 1
+                    title = o.get('title', '')
+                    snippet = o.get('snippet', '')
+                    link = o.get('link', '')
+                    res += f"\n[來源{source_num}] {title}\n網址：{link}\n摘要：{snippet}\n---\n"
             else:
                 print(f"⚠️ Serper API 回應異常: HTTP {r.status_code}")
         except requests.exceptions.Timeout:
@@ -105,7 +111,9 @@ DATA_JSON: {{"ffb": 8.1, "cpo": 45.5, "bmd_myr": 4828, "ex_rate": 7.78}}
 - 嚴禁簽名落款
 - 嚴禁包含與棕櫚油無關的內容
 - 每個 · 建議點必須是獨立完整的一段，不可只寫一行短句
-- DATA_JSON 中的數值必須根據搜尋資料更新為當日實際數字
+- DATA_JSON 中的數值必須出現在上方搜尋資料中，若無法確認請保留預設值，不得自行估算
+- 凡引用具體數字（價格、漲跌幅、百分比）必須在句末標注 [來源N]，N 為搜尋資料的來源編號
+- 嚴禁引用搜尋資料中未出現的數字、事件或機構
 
 搜尋資料：{raw_data}"""
         
