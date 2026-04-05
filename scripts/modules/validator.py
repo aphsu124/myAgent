@@ -61,10 +61,9 @@ def is_report_valid(text):
     if "DATA_JSON" in text:
         return False, "包含技術雜質 (DATA_JSON 未清理乾淨)"
 
-    # 來源引用 soft check（不阻擋發送，僅附加警告）
-    source_refs = len(re.findall(r'\[來源\d+\]', text))
-    if source_refs < 2:
-        return True, f"市場報告品質通過 (V3) ⚠️ 來源引用數不足（{source_refs}）"
+    # 來源標注符號不應出現在內文
+    if re.search(r'\[來源\d+\]', text):
+        return False, "內文含來源標注符號（[來源N]），請移除"
 
     return True, "市場報告品質通過 (V3)"
 

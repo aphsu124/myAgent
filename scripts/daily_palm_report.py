@@ -111,8 +111,8 @@ DATA_JSON: {{"ffb": 8.1, "cpo": 45.5, "bmd_myr": 4828, "ex_rate": 7.78}}
 - 嚴禁簽名落款
 - 嚴禁包含與棕櫚油無關的內容
 - 每個 · 建議點必須是獨立完整的一段，不可只寫一行短句
-- DATA_JSON 中的數值必須出現在上方搜尋資料中，若無法確認請保留預設值，不得自行估算
-- 凡引用具體數字（價格、漲跌幅、百分比）必須在句末標注 [來源N]，N 為搜尋資料的來源編號
+- DATA_JSON 中的數值必須根據搜尋資料更新為當日實際數字，若無法確認請保留預設值
+- 嚴禁在內文出現任何來源標注符號（如 [來源N]、[1]、① 等）
 - 嚴禁引用搜尋資料中未出現的數字、事件或機構
 
 搜尋資料：{raw_data}"""
@@ -162,9 +162,12 @@ DATA_JSON: {{"ffb": 8.1, "cpo": 45.5, "bmd_myr": 4828, "ex_rate": 7.78}}
                 res_c, msg_c = validator.is_report_valid(content)
                 res_d, msg_d = validator.is_data_valid(data)
                 if res_c and res_d: is_valid = True
-                else: error_msg = f"{msg_c} | {msg_d}"
+                else:
+                    error_msg = f"{msg_c} | {msg_d}"
+                    print(f"⚠️ 第 {attempts} 次驗證失敗：{error_msg}")
         except Exception as e:
             error_msg = str(e)
+            print(f"⚠️ 第 {attempts} 次產出異常：{error_msg}")
 
     if is_valid:
         bmd_thb, basis = excel_handler.update_data(date_ds, data.get('ffb'), data.get('cpo'), data.get('bmd_myr'), data.get('ex_rate'))
