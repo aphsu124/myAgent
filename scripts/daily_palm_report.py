@@ -292,6 +292,7 @@ DATA_JSON: {{"ffb": 8.1, "cpo": 45.5, "bmd_myr": 4828, "ex_rate": 7.78}}
             with open(sent_log, "a") as f: f.write(today_key + "\n")
             print("✅ 深度報告發布成功。")
     else:
+        print(f"❌ 日報最終失敗，原因：{error_msg}")
         line_handler.send_push_notification("🚨 品質異常警報", date_ds, 0, 0, f"修正失敗：{error_msg}")
 
 if __name__ == "__main__":
